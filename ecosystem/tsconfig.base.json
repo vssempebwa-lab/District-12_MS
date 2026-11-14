@@ -1,0 +1,32 @@
+{
+  "compilerOptions": {
+    "target": "ES2022",
+    "lib": ["dom", "dom.iterable", "esnext"],
+    "allowJs": true,
+    "skipLibCheck": true,
+    "strict": true,
+    "noEmit": true,
+    "esModuleInterop": true,
+    "module": "esnext",
+    "moduleResolution": "bundler",
+    "resolveJsonModule": true,
+    "isolatedModules": true,
+    "jsx": "preserve",
+    "incremental": true,
+    "forceConsistentCasingInFileNames": true,
+    "plugins": [{ "name": "next" }],
+    "paths": {
+      "@d12/contracts": ["./packages/contracts/src/index.ts"],
+      "@d12/contracts/*": ["./packages/contracts/src/*"],
+      "@d12/auth": ["./packages/auth/src/index.ts"],
+      "@d12/auth/*": ["./packages/auth/src/*"],
+      "@d12/db": ["./packages/db/src/index.ts"],
+      "@d12/db/*": ["./packages/db/src/*"],
+      "@d12/ui": ["./packages/ui/src/index.tsx"],
+      "@d12/telemetry": ["./packages/telemetry/src/index.ts"],
+      "@d12/tenant-workspace": ["./packages/tenant-workspace/src/index.tsx"],
+      "@d12/tenant-workspace/server": ["./packages/tenant-workspace/src/server.ts"],
+      "@d12/tenant-workspace/*": ["./packages/tenant-workspace/src/*"]
+    }
+  }
+}

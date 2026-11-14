@@ -1,0 +1,44 @@
+{
+  "extends": "../../tsconfig.base.json",
+  "compilerOptions": {
+    "baseUrl": ".",
+    "paths": {
+      "@/*": [
+        "./*"
+      ],
+      "@d12/contracts": [
+        "../../packages/contracts/src/index.ts"
+      ],
+      "@d12/auth": [
+        "../../packages/auth/src/index.ts"
+      ],
+      "@d12/db": [
+        "../../packages/db/src/index.ts"
+      ],
+      "@d12/ui": [
+        "../../packages/ui/src/index.tsx"
+      ],
+      "@d12/telemetry": [
+        "../../packages/telemetry/src/index.ts"
+      ],
+      "@d12/tenant-workspace": [
+        "../../packages/tenant-workspace/src/index.tsx"
+      ],
+      "@d12/tenant-workspace/*": [
+        "../../packages/tenant-workspace/src/*"
+      ]
+    }
+  },
+  "include": [
+    "next-env.d.ts",
+    "../../next-env.d.ts",
+    "**/*.ts",
+    "**/*.tsx",
+    "../../packages/**/*.ts",
+    "../../packages/**/*.tsx",
+    ".next/types/**/*.ts"
+  ],
+  "exclude": [
+    "node_modules"
+  ]
+}

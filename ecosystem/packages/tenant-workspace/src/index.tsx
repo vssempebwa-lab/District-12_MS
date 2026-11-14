@@ -1,0 +1,10 @@
+export * from "./desk-types";
+export * from "./desk-ui";
+export * from "./entity-config";
+export * from "./format";
+export * from "./report-detail";
+export * from "./reports";
+export { OpsBoard, type EntityRow, type OpsBoardProps } from "./ops-board";
+export { TenantShell } from "./shell";
+export { SyncButton, syncTelemetry, type SyncOutcome } from "./sync-button";
+export * from "./staff-detail";

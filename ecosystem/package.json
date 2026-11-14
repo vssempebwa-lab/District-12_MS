@@ -1,0 +1,48 @@
+{
+  "name": "district12-ecosystem",
+  "version": "1.0.0",
+  "private": true,
+  "description": "District 12 multi-tenant ecosystem: central hub, SSO, HR provisioning, warehouse and five subsidiary workspaces.",
+  "workspaces": [
+    "apps/*",
+    "packages/*"
+  ],
+  "scripts": {
+    "dev:hub": "next dev apps/hub -p 3100",
+    "dev:passito": "next dev apps/passito -p 3001",
+    "dev:mariz": "next dev apps/mariz -p 3002",
+    "dev:rub-shoots": "next dev apps/rub-shoots -p 3003",
+    "dev:shop-for-me": "next dev apps/shop-for-me -p 3004",
+    "dev:expresso-point": "next dev apps/expresso-point -p 3005",
+    "build:hub": "next build apps/hub",
+    "build:passito": "next build apps/passito",
+    "build:mariz": "next build apps/mariz",
+    "build:rub-shoots": "next build apps/rub-shoots",
+    "build:shop-for-me": "next build apps/shop-for-me",
+    "build:expresso-point": "next build apps/expresso-point",
+    "build:all": "npm run build:hub && npm run build:passito && npm run build:mariz && npm run build:rub-shoots && npm run build:shop-for-me && npm run build:expresso-point",
+    "typecheck": "tsc -p tsconfig.json --noEmit && tsc -p apps/hub/tsconfig.json --noEmit && tsc -p apps/passito/tsconfig.json --noEmit && tsc -p apps/mariz/tsconfig.json --noEmit && tsc -p apps/rub-shoots/tsconfig.json --noEmit && tsc -p apps/shop-for-me/tsconfig.json --noEmit && tsc -p apps/expresso-point/tsconfig.json --noEmit",
+    "scaffold:tenant": "node scripts/scaffold-tenant.mjs",
+    "telemetry:worker": "node apps/passito/worker/telemetry.mjs"
+  },
+  "dependencies": {
+    "@supabase/supabase-js": "^2.58.0",
+    "clsx": "^2.1.1",
+    "lucide-react": "^0.446.0",
+    "next": "13.5.1",
+    "react": "18.2.0",
+    "react-dom": "18.2.0",
+    "tailwind-merge": "^2.5.2",
+    "zod": "^3.23.8"
+  },
+  "devDependencies": {
+    "@types/node": "20.6.2",
+    "@types/react": "18.2.22",
+    "@types/react-dom": "18.2.7",
+    "autoprefixer": "10.4.15",
+    "postcss": "8.4.30",
+    "tailwindcss": "3.3.3",
+    "tailwindcss-animate": "^1.0.7",
+    "typescript": "5.2.2"
+  }
+}

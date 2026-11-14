@@ -3,11 +3,12 @@
   "version": "0.1.0",
   "private": true,
   "scripts": {
-    "dev": "next dev",
-    "build": "next build",
-    "start": "next start",
-    "lint": "next lint",
-    "typecheck": "tsc --noEmit"
+    "dev": "next dev ecosystem/apps/hub -p 3100",
+    "dev:hub": "next dev ecosystem/apps/hub -p 3100",
+    "build": "next build ecosystem/apps/hub",
+    "build:hub": "next build ecosystem/apps/hub",
+    "start": "next start ecosystem/apps/hub -p 3100",
+    "typecheck": "npm --prefix ecosystem run typecheck"
   },
   "dependencies": {
     "@hookform/resolvers": "^3.9.0",

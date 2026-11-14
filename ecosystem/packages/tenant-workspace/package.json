@@ -1,0 +1,11 @@
+{
+  "name": "@d12/tenant-workspace",
+  "version": "1.0.0",
+  "private": true,
+  "main": "./src/index.tsx",
+  "types": "./src/index.tsx",
+  "exports": {
+    ".": "./src/index.tsx",
+    "./server": "./src/server.ts"
+  }
+}
