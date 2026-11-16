@@ -26,7 +26,7 @@ export async function GET(request: Request): Promise<NextResponse> {
     );
   }
 
-  const response = NextResponse.redirect(new URL(next, url.origin), 303);
+  const response = new NextResponse(null, { status: 303, headers: { location: next } });
   response.headers.append("set-cookie", sessionCookie(token));
   return response;
 }

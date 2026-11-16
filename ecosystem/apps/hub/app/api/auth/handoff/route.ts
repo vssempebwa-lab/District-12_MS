@@ -7,7 +7,7 @@ import {
   sessionFromRequest,
   tenantCallbackUrl,
 } from "@d12/auth";
-import { isTenantId } from "@d12/contracts";
+import { hubAppUrl, isTenantId } from "@d12/contracts";
 import { jsonError } from "@/lib/http";
 
 export async function GET(request: Request): Promise<NextResponse> {
@@ -21,7 +21,7 @@ export async function GET(request: Request): Promise<NextResponse> {
 
   const session = await sessionFromRequest(request);
   if (!session) {
-    const loginUrl = new URL("/login", url.origin);
+    const loginUrl = new URL("/login", hubAppUrl());
     loginUrl.searchParams.set("next", `${url.pathname}${url.search}`);
     return NextResponse.redirect(loginUrl);
   }

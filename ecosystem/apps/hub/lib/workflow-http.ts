@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { hasPermission, sessionFromRequest, type SessionClaims } from "@d12/auth";
-import { isGlobalRole, permissionsForRoles } from "@d12/contracts";
+import { isCrossOriginRequest, isGlobalRole, permissionsForRoles } from "@d12/contracts";
 import { listAccounts } from "./accounts";
 import { jsonError } from "./http";
 import { HubRecordError } from "./records";
@@ -9,8 +9,7 @@ export async function currentWorkflowActor(request: Request, permission: string)
   const session = await sessionFromRequest(request);
   if (!session) return jsonError("UNAUTHORIZED", "Sign in to continue", 401);
   if (request.method !== "GET") {
-    const origin = request.headers.get("origin");
-    if ((origin && origin !== new URL(request.url).origin) || request.headers.get("sec-fetch-site") === "cross-site") {
+    if (isCrossOriginRequest(request) || request.headers.get("sec-fetch-site") === "cross-site") {
       return jsonError("FORBIDDEN", "Cross-origin writes are not allowed", 403);
     }
   }

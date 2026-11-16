@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import {
   apiError,
   hubAppUrl,
+  isCrossOriginRequest,
   shiftEndViaSchema,
   type ApiErrorCode,
   type TenantId,
@@ -13,8 +14,7 @@ function failure(code: ApiErrorCode, message: string, status: number): NextRespo
 }
 
 export async function handleShiftEnd(request: Request, tenantId: TenantId): Promise<NextResponse> {
-  const origin = request.headers.get("origin");
-  if (origin && origin !== new URL(request.url).origin) {
+  if (isCrossOriginRequest(request)) {
     return failure("FORBIDDEN", "Cross-origin shift updates are not allowed", 403);
   }
 

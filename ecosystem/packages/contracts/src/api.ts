@@ -40,3 +40,24 @@ export function apiError(
 ): ApiErrorBody {
   return { error: { code, message, ...(details ? { details } : {}) } };
 }
+
+// Compares hosts rather than full URLs because serverless runtimes report the
+// public host with an internal port (or an internal host) in request.url.
+export function isCrossOriginRequest(request: Request): boolean {
+  const origin = request.headers.get("origin");
+  if (!origin) return false;
+
+  let originHost: string;
+  try {
+    originHost = new URL(origin).hostname;
+  } catch {
+    return true;
+  }
+
+  const forwardedHost = request.headers.get("x-forwarded-host") ?? request.headers.get("host");
+  const requestHost = forwardedHost
+    ? forwardedHost.split(",")[0].trim().replace(/:\d+$/, "")
+    : new URL(request.url).hostname;
+
+  return originHost.toLowerCase() !== requestHost.toLowerCase();
+}
