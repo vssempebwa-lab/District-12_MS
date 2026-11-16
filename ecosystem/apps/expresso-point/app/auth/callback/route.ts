@@ -5,7 +5,7 @@ import {
   safeLocalPath,
   sessionCookie,
 } from "@d12/auth";
-import { apiError, hubAppUrl } from "@d12/contracts";
+import { apiError, hubAppUrl, tenantAppUrl } from "@d12/contracts";
 import { TENANT, TENANT_ID } from "@/lib/tenant";
 
 export async function GET(request: Request): Promise<NextResponse> {
@@ -26,7 +26,7 @@ export async function GET(request: Request): Promise<NextResponse> {
     );
   }
 
-  const response = new NextResponse(null, { status: 303, headers: { location: next } });
+  const response = NextResponse.redirect(new URL(next, tenantAppUrl(TENANT_ID)), 303);
   response.headers.append("set-cookie", sessionCookie(token));
   return response;
 }
