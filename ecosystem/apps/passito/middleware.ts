@@ -7,11 +7,19 @@ export async function middleware(request: NextRequest): Promise<NextResponse> {
   const token = request.cookies.get(SESSION_COOKIE)?.value;
   const session = token ? await readSessionToken(token) : null;
 
+  // Netlify re-attaches the handoff query to route-handler redirects.
+  const clean = request.nextUrl.clone();
+  const handoff = clean.searchParams.has("token");
+  clean.searchParams.delete("token");
+  clean.searchParams.delete("next");
+
   if (!session || !canAccessTenant(session, TENANT_ID)) {
     const login = new URL("/login", hubAppUrl());
-    login.searchParams.set("next", request.nextUrl.href);
+    login.searchParams.set("next", clean.href);
     return NextResponse.redirect(login);
   }
+
+  if (handoff) return NextResponse.redirect(clean);
 
   return NextResponse.next();
 }
