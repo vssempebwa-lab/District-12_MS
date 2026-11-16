@@ -1,8 +1,12 @@
 import {
+  CALL_DIRECTIONS,
+  CALL_OUTCOMES,
   CUSTOMER_STATUSES,
   CUSTOMER_TIERS,
   INVOICE_STATUSES,
   LEAD_STAGES,
+  MARIZ_SERVICES,
+  MEETING_STATUSES,
   PROJECT_STATUSES,
   SALE_STATUSES,
   STAFF_STATUSES,
@@ -10,9 +14,10 @@ import {
   TASK_STATUSES,
   TRANSACTION_KINDS,
   type OpsEntity,
+  type TenantId,
 } from "@d12/contracts";
 
-export type FieldType = "text" | "email" | "number" | "date" | "select" | "textarea";
+export type FieldType = "text" | "email" | "number" | "date" | "time" | "select" | "textarea" | "services";
 
 export interface FieldOption {
   value: string;
@@ -32,7 +37,7 @@ export interface FieldConfig {
 export interface ColumnConfig {
   key: string;
   label: string;
-  kind?: "text" | "currency" | "percent" | "date" | "badge" | "muted" | "stacked";
+  kind?: "text" | "currency" | "percent" | "date" | "badge" | "muted" | "stacked" | "services";
   align?: "left" | "right";
 }
 
@@ -42,7 +47,7 @@ export interface EntityConfig {
   plural: string;
   countLabel?: string;
   description: string;
-  primaryKey: "name" | "title" | "description" | "number";
+  primaryKey: string;
   filterKey: string;
   columns: ColumnConfig[];
   fields: FieldConfig[];
@@ -109,7 +114,7 @@ export const ENTITY_CONFIG: Record<OpsEntity, EntityConfig> = {
       { key: "email", label: "Email", type: "email" },
       { key: "phone", label: "Phone", type: "text" },
       { key: "tier", label: "Tier", type: "select", options: options(CUSTOMER_TIERS) },
-      { key: "status", label: "Status", type: "select", options: options(CUSTOMER_STATUSES) },
+      { key: "status", label: "Status", type: "select", options: options(["active", "dormant"]) },
       { key: "owner", label: "Account owner", type: "text" },
       { key: "lifetimeValue", label: "Lifetime value (UGX)", type: "number" },
       { key: "lastOrder", label: "Last order", type: "date", wide: true },
@@ -166,6 +171,67 @@ export const ENTITY_CONFIG: Record<OpsEntity, EntityConfig> = {
       { key: "dueOn", label: "Due date", type: "date" },
     ],
     defaults: { priority: "medium", status: "open", dueOn: "" },
+  },
+  meetings: {
+    entity: "meetings",
+    singular: "Meeting",
+    plural: "Meetings",
+    description: "Scheduled conversations with the people, agenda and outcomes that matter.",
+    primaryKey: "title",
+    filterKey: "status",
+    columns: [
+      { key: "title", label: "Meeting", kind: "stacked" },
+      { key: "meetingOn", label: "Date", kind: "date" },
+      { key: "startTime", label: "Start", kind: "muted" },
+      { key: "location", label: "Where", kind: "muted" },
+      { key: "owner", label: "Owner" },
+      { key: "status", label: "Status", kind: "badge" },
+    ],
+    fields: [
+      { key: "title", label: "Meeting title", type: "text", required: true, wide: true },
+      { key: "meetingOn", label: "Date", type: "date", required: true },
+      { key: "startTime", label: "Start time", type: "time" },
+      { key: "endTime", label: "End time", type: "time" },
+      { key: "location", label: "Location or link", type: "text", placeholder: "Room, office or online link" },
+      { key: "attendees", label: "Attendees", type: "text", placeholder: "Names or teams present" },
+      { key: "status", label: "Status", type: "select", options: options(MEETING_STATUSES) },
+      { key: "owner", label: "Owner", type: "text" },
+      { key: "followUpOn", label: "Follow-up date", type: "date" },
+      { key: "agenda", label: "Agenda", type: "textarea", wide: true },
+      { key: "notes", label: "Decisions and outcomes", type: "textarea", wide: true },
+    ],
+    defaults: { meetingOn: TODAY, status: "scheduled", startTime: "", endTime: "" },
+  },
+  calls: {
+    entity: "calls",
+    singular: "Call",
+    plural: "Calls",
+    description: "Inbound and outbound calls with the contact, purpose and outcome recorded.",
+    primaryKey: "contactName",
+    filterKey: "outcome",
+    columns: [
+      { key: "contactName", label: "Contact", kind: "stacked" },
+      { key: "callOn", label: "Date", kind: "date" },
+      { key: "callTime", label: "Time", kind: "muted" },
+      { key: "direction", label: "Direction", kind: "badge" },
+      { key: "outcome", label: "Outcome", kind: "badge" },
+      { key: "owner", label: "Owner" },
+    ],
+    fields: [
+      { key: "contactName", label: "Contact name", type: "text", required: true },
+      { key: "company", label: "Company", type: "text" },
+      { key: "phone", label: "Phone", type: "text", placeholder: "+256 ..." },
+      { key: "direction", label: "Direction", type: "select", options: options(CALL_DIRECTIONS) },
+      { key: "callOn", label: "Date", type: "date", required: true },
+      { key: "callTime", label: "Time", type: "time" },
+      { key: "durationMin", label: "Duration (minutes)", type: "number" },
+      { key: "outcome", label: "Outcome", type: "select", options: options(CALL_OUTCOMES) },
+      { key: "owner", label: "Owner", type: "text" },
+      { key: "followUpOn", label: "Follow-up date", type: "date" },
+      { key: "purpose", label: "Purpose", type: "text", wide: true },
+      { key: "notes", label: "Call notes", type: "textarea", wide: true },
+    ],
+    defaults: { callOn: TODAY, direction: "outbound", outcome: "connected", durationMin: 0, callTime: "" },
   },
   projects: {
     entity: "projects",
@@ -309,3 +375,81 @@ export const ENTITY_CONFIG: Record<OpsEntity, EntityConfig> = {
     detailBase: "/staff",
   },
 };
+
+const MARIZ_SERVICE_OPTIONS: FieldOption[] = MARIZ_SERVICES.map((service) => ({
+  value: service.key,
+  label: service.label,
+}));
+
+const MARIZ_LEADS: EntityConfig = {
+  ...ENTITY_CONFIG.leads,
+  description: "Pipeline conversations, with the lead and the worker handling it written down.",
+  fields: [
+    ...ENTITY_CONFIG.leads.fields,
+    {
+      key: "description",
+      label: "Lead and worker description",
+      type: "textarea",
+      wide: true,
+      placeholder: "What the lead needs, who is working it and anything the next person should know.",
+    },
+  ],
+};
+
+const MARIZ_CUSTOMERS: EntityConfig = {
+  ...ENTITY_CONFIG.customers,
+  description: "Buying accounts with agreed services, issue dates and owners; marking one paid records a sale.",
+  columns: [
+    { key: "name", label: "Customer", kind: "stacked" },
+    { key: "services", label: "Agreed services", kind: "services" },
+    { key: "status", label: "Status", kind: "badge" },
+    { key: "issueOn", label: "Issued", kind: "date", align: "right" },
+    { key: "owner", label: "Owner" },
+    { key: "lifetimeValue", label: "Value", kind: "currency", align: "right" },
+  ],
+  fields: [
+    { key: "name", label: "Customer name", type: "text", required: true },
+    { key: "company", label: "Company", type: "text" },
+    { key: "email", label: "Email", type: "email" },
+    { key: "phone", label: "Phone", type: "text" },
+    { key: "services", label: "Agreed services and values", type: "services", options: MARIZ_SERVICE_OPTIONS, wide: true },
+    { key: "issueOn", label: "Date of issue", type: "date" },
+    { key: "tier", label: "Tier", type: "select", options: options(CUSTOMER_TIERS) },
+    { key: "status", label: "Status", type: "select", options: options(CUSTOMER_STATUSES) },
+    { key: "owner", label: "Customer owner", type: "text" },
+    { key: "lifetimeValue", label: "Lifetime value (UGX)", type: "number" },
+    { key: "lastOrder", label: "Last order", type: "date", wide: true },
+  ],
+  defaults: { tier: "standard", status: "active", lifetimeValue: 0, lastOrder: "", issueOn: TODAY },
+};
+
+const MARIZ_TASKS: EntityConfig = {
+  ...ENTITY_CONFIG.tasks,
+  description: "Delivery work with owners, priorities, due date and time, and a written brief.",
+  columns: [
+    ...ENTITY_CONFIG.tasks.columns,
+    { key: "dueTime", label: "Time", kind: "muted" },
+  ],
+  fields: [
+    { key: "title", label: "Task", type: "text", required: true, wide: true },
+    { key: "assignee", label: "Assignee", type: "text" },
+    { key: "related", label: "Related to", type: "text", placeholder: "Customer, campaign, order" },
+    { key: "priority", label: "Priority", type: "select", options: options(TASK_PRIORITIES) },
+    { key: "status", label: "Status", type: "select", options: options(TASK_STATUSES) },
+    { key: "dueOn", label: "Due date", type: "date" },
+    { key: "dueTime", label: "Due time", type: "time" },
+    { key: "description", label: "Task brief", type: "textarea", wide: true, placeholder: "Explain what the task involves and how it should be done." },
+  ],
+  defaults: { priority: "medium", status: "open", dueOn: "", dueTime: "" },
+};
+
+const MARIZ_OVERRIDES: Partial<Record<OpsEntity, EntityConfig>> = {
+  leads: MARIZ_LEADS,
+  customers: MARIZ_CUSTOMERS,
+  tasks: MARIZ_TASKS,
+};
+
+export function entityConfigFor(entity: OpsEntity, tenantId?: TenantId): EntityConfig {
+  if (tenantId === "mariz") return MARIZ_OVERRIDES[entity] ?? ENTITY_CONFIG[entity];
+  return ENTITY_CONFIG[entity];
+}

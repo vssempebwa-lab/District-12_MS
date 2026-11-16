@@ -30,6 +30,8 @@ const ENTITY_TABLE: Record<OpsEntity, string> = {
   customers: "d12_ops_customers",
   sales: "d12_ops_sales",
   tasks: "d12_ops_tasks",
+  meetings: "d12_ops_meetings",
+  calls: "d12_ops_calls",
   projects: "d12_ops_projects",
   inventory: "d12_ops_inventory",
   transactions: "d12_ops_transactions",
@@ -44,6 +46,8 @@ const WORK_OWNER: Partial<Record<OpsEntity, "owner" | "assignee">> = {
   customers: "owner",
   sales: "owner",
   tasks: "assignee",
+  meetings: "owner",
+  calls: "owner",
   projects: "owner",
   invoices: "owner",
 };
@@ -117,7 +121,16 @@ function snakeKey(key: string): string {
   return key.replace(/[A-Z]/g, (char) => `_${char.toLowerCase()}`);
 }
 
-const DATE_KEYS = new Set(["lastOrder", "occurredOn", "dueOn", "issueOn", "joinedOn"]);
+const DATE_KEYS = new Set([
+  "lastOrder",
+  "occurredOn",
+  "dueOn",
+  "issueOn",
+  "meetingOn",
+  "callOn",
+  "followUpOn",
+  "joinedOn",
+]);
 
 function draftToRow(draft: Record<string, unknown>): Record<string, unknown> {
   const row: Record<string, unknown> = {};
@@ -314,6 +327,8 @@ export async function getWorkspaceOverview(tenantId: TenantId): Promise<Workspac
     customerRows,
     saleRows,
     taskRows,
+    meetingRows,
+    callRows,
     projectRows,
     inventoryRows,
     transactionRows,
@@ -325,6 +340,8 @@ export async function getWorkspaceOverview(tenantId: TenantId): Promise<Workspac
     listEntity(tenantId, "customers"),
     listEntity(tenantId, "sales"),
     listEntity(tenantId, "tasks"),
+    listEntity(tenantId, "meetings"),
+    listEntity(tenantId, "calls"),
     listEntity(tenantId, "projects"),
     listEntity(tenantId, "inventory"),
     listEntity(tenantId, "transactions"),
@@ -373,6 +390,8 @@ export async function getWorkspaceOverview(tenantId: TenantId): Promise<Workspac
     ...customers,
     ...sales,
     ...tasks,
+    ...meetingRows,
+    ...callRows,
     ...projectRows,
     ...inventoryRows,
     ...transactionRows,
@@ -389,6 +408,8 @@ export async function getWorkspaceOverview(tenantId: TenantId): Promise<Workspac
       customers: customers.length,
       sales: sales.length,
       tasks: tasks.length,
+      meetings: meetingRows.length,
+      calls: callRows.length,
       projects: projectRows.length,
       inventory: inventoryRows.length,
       transactions: transactionRows.length,

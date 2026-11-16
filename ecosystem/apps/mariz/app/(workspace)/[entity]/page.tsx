@@ -27,6 +27,8 @@ export default async function EntityPage({ params }: { params: { entity: string 
       records={records as unknown as EntityRow[]}
       canWrite={canWrite}
       canSync={canSync}
+      tenantId={TENANT_ID}
+      canConvertLeads={params.entity === "leads"}
       personalName={personalWorkName(session) ?? undefined}
     />
   );

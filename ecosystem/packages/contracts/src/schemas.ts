@@ -7,7 +7,7 @@ import { TENANT_IDS, type TenantId } from "./tenants";
 // ---------------------------------------------------------------------------
 export const LEAD_STAGES = ["new", "contacted", "qualified", "won", "lost"] as const;
 export const CUSTOMER_TIERS = ["key", "growth", "standard"] as const;
-export const CUSTOMER_STATUSES = ["active", "dormant"] as const;
+export const CUSTOMER_STATUSES = ["active", "dormant", "paid"] as const;
 export const SALE_STATUSES = ["paid", "pending", "refunded"] as const;
 export const TASK_PRIORITIES = ["high", "medium", "low"] as const;
 export const TASK_STATUSES = ["open", "in_progress", "done"] as const;
@@ -15,11 +15,40 @@ export const PROJECT_STATUSES = ["planned", "active", "on_hold", "completed", "c
 export const TRANSACTION_KINDS = ["income", "expense"] as const;
 export const INVOICE_STATUSES = ["draft", "pending", "paid", "void"] as const;
 export const STAFF_STATUSES = ["active", "on_leave", "contract"] as const;
+export const MEETING_STATUSES = ["scheduled", "held", "cancelled"] as const;
+export const CALL_DIRECTIONS = ["inbound", "outbound"] as const;
+export const CALL_OUTCOMES = ["connected", "missed", "follow_up", "closed"] as const;
+
+export const MARIZ_SERVICES = [
+  { key: "software_development", label: "Software and website development" },
+  { key: "recruitment", label: "Recruitment and Talent acquisition" },
+  { key: "photography", label: "Photography and cinematography" },
+  { key: "consultancy", label: "Business consultancy and Advisory" },
+  { key: "digital_marketing", label: "Digital Marketing" },
+  { key: "call_support", label: "Call support and audio services" },
+  { key: "corporate_branding", label: "Corporate branding" },
+  { key: "sales_outsourcing", label: "Sales and Marketing outsourcing" },
+  { key: "community_service", label: "Community service" },
+  { key: "property_finishing", label: "Property painting and finishing solutions" },
+] as const;
+
+export type MarizServiceKey = (typeof MARIZ_SERVICES)[number]["key"];
+
+export function marizServiceLabel(key: string): string {
+  return MARIZ_SERVICES.find((service) => service.key === key)?.label ?? key;
+}
 
 const dateString = z.string().regex(/^\d{4}-\d{2}-\d{2}$/, "Use YYYY-MM-DD");
+const timeString = z.string().regex(/^([01]\d|2[0-3]):[0-5]\d$/, "Use HH:MM");
 const optionalDate = z.union([dateString, z.literal("")]).default("");
+const optionalTime = z.union([timeString, z.literal("")]).default("");
 const emailOrBlank = z.union([z.string().trim().email(), z.literal("")]).default("");
 const shortText = (max = 120) => z.string().trim().max(max).default("");
+
+export const serviceLineSchema = z.object({
+  service: z.string().trim().min(1).max(60),
+  amount: z.coerce.number().min(0).max(1_000_000_000_000).default(0),
+});
 
 export const leadInputSchema = z.object({
   name: z.string().trim().min(1, "Name is required").max(120),
@@ -31,6 +60,7 @@ export const leadInputSchema = z.object({
   value: z.coerce.number().min(0).max(1_000_000_000_000).default(0),
   owner: shortText(80),
   nextStep: shortText(160),
+  description: shortText(2000),
 });
 
 export const customerInputSchema = z.object({
@@ -43,6 +73,8 @@ export const customerInputSchema = z.object({
   owner: shortText(80),
   lifetimeValue: z.coerce.number().min(0).max(1_000_000_000_000).default(0),
   lastOrder: optionalDate,
+  issueOn: optionalDate,
+  services: z.array(serviceLineSchema).max(20).default([]),
 });
 
 export const saleInputSchema = z.object({
@@ -60,9 +92,40 @@ export const taskInputSchema = z.object({
   title: z.string().trim().min(1, "Title is required").max(160),
   assignee: shortText(80),
   dueOn: optionalDate,
+  dueTime: optionalTime,
   priority: z.enum(TASK_PRIORITIES).default("medium"),
   status: z.enum(TASK_STATUSES).default("open"),
   related: shortText(120),
+  description: shortText(2000),
+});
+
+export const meetingInputSchema = z.object({
+  title: z.string().trim().min(1, "Title is required").max(160),
+  meetingOn: dateString,
+  startTime: optionalTime,
+  endTime: optionalTime,
+  location: shortText(160),
+  attendees: shortText(300),
+  status: z.enum(MEETING_STATUSES).default("scheduled"),
+  owner: shortText(80),
+  followUpOn: optionalDate,
+  agenda: shortText(2000),
+  notes: shortText(2000),
+});
+
+export const callInputSchema = z.object({
+  contactName: z.string().trim().min(1, "Contact name is required").max(120),
+  company: shortText(120),
+  phone: shortText(40),
+  direction: z.enum(CALL_DIRECTIONS).default("outbound"),
+  callOn: dateString,
+  callTime: optionalTime,
+  durationMin: z.coerce.number().min(0).max(10_000).default(0),
+  purpose: shortText(200),
+  outcome: z.enum(CALL_OUTCOMES).default("connected"),
+  owner: shortText(80),
+  followUpOn: optionalDate,
+  notes: shortText(2000),
 });
 
 export const projectInputSchema = z.object({
@@ -126,6 +189,8 @@ export const opsEntitySchema = z.enum([
   "customers",
   "sales",
   "tasks",
+  "meetings",
+  "calls",
   "projects",
   "inventory",
   "transactions",
@@ -141,6 +206,8 @@ export const OPS_LABELS: Record<OpsEntity, { singular: string; plural: string }>
   customers: { singular: "Customer", plural: "Customers" },
   sales: { singular: "Sale", plural: "Sales" },
   tasks: { singular: "Task", plural: "Tasks" },
+  meetings: { singular: "Meeting", plural: "Meetings" },
+  calls: { singular: "Call", plural: "Calls" },
   projects: { singular: "Project", plural: "Projects" },
   inventory: { singular: "Item", plural: "Inventory" },
   transactions: { singular: "Transaction", plural: "Finance" },
@@ -153,6 +220,8 @@ export const OPS_INPUT_SCHEMAS = {
   customers: customerInputSchema,
   sales: saleInputSchema,
   tasks: taskInputSchema,
+  meetings: meetingInputSchema,
+  calls: callInputSchema,
   projects: projectInputSchema,
   inventory: inventoryInputSchema,
   transactions: transactionInputSchema,
@@ -171,6 +240,8 @@ export const leadRecordSchema = leadInputSchema.extend(recordBase);
 export const customerRecordSchema = customerInputSchema.extend(recordBase);
 export const saleRecordSchema = saleInputSchema.extend(recordBase);
 export const taskRecordSchema = taskInputSchema.extend(recordBase);
+export const meetingRecordSchema = meetingInputSchema.extend(recordBase);
+export const callRecordSchema = callInputSchema.extend(recordBase);
 export const projectRecordSchema = projectInputSchema.extend(recordBase);
 export const inventoryRecordSchema = inventoryInputSchema.extend(recordBase);
 export const transactionRecordSchema = transactionInputSchema.extend(recordBase);
@@ -182,6 +253,8 @@ export const OPS_RECORD_SCHEMAS = {
   customers: customerRecordSchema,
   sales: saleRecordSchema,
   tasks: taskRecordSchema,
+  meetings: meetingRecordSchema,
+  calls: callRecordSchema,
   projects: projectRecordSchema,
   inventory: inventoryRecordSchema,
   transactions: transactionRecordSchema,
@@ -193,6 +266,8 @@ export type LeadInput = z.input<typeof leadInputSchema>;
 export type CustomerInput = z.input<typeof customerInputSchema>;
 export type SaleInput = z.input<typeof saleInputSchema>;
 export type TaskInput = z.input<typeof taskInputSchema>;
+export type MeetingInput = z.input<typeof meetingInputSchema>;
+export type CallInput = z.input<typeof callInputSchema>;
 export type ProjectInput = z.input<typeof projectInputSchema>;
 export type InventoryInput = z.input<typeof inventoryInputSchema>;
 export type TransactionInput = z.input<typeof transactionInputSchema>;
@@ -203,6 +278,8 @@ export type OpsInput =
   | CustomerInput
   | SaleInput
   | TaskInput
+  | MeetingInput
+  | CallInput
   | ProjectInput
   | InventoryInput
   | TransactionInput
@@ -213,6 +290,8 @@ export type LeadDraft = z.infer<typeof leadInputSchema>;
 export type CustomerDraft = z.infer<typeof customerInputSchema>;
 export type SaleDraft = z.infer<typeof saleInputSchema>;
 export type TaskDraft = z.infer<typeof taskInputSchema>;
+export type MeetingDraft = z.infer<typeof meetingInputSchema>;
+export type CallDraft = z.infer<typeof callInputSchema>;
 export type ProjectDraft = z.infer<typeof projectInputSchema>;
 export type InventoryDraft = z.infer<typeof inventoryInputSchema>;
 export type TransactionDraft = z.infer<typeof transactionInputSchema>;
@@ -223,6 +302,8 @@ export type OpsDraft =
   | CustomerDraft
   | SaleDraft
   | TaskDraft
+  | MeetingDraft
+  | CallDraft
   | ProjectDraft
   | InventoryDraft
   | TransactionDraft
@@ -233,16 +314,21 @@ export type LeadRecord = z.infer<typeof leadRecordSchema>;
 export type CustomerRecord = z.infer<typeof customerRecordSchema>;
 export type SaleRecord = z.infer<typeof saleRecordSchema>;
 export type TaskRecord = z.infer<typeof taskRecordSchema>;
+export type MeetingRecord = z.infer<typeof meetingRecordSchema>;
+export type CallRecord = z.infer<typeof callRecordSchema>;
 export type ProjectRecord = z.infer<typeof projectRecordSchema>;
 export type InventoryRecord = z.infer<typeof inventoryRecordSchema>;
 export type TransactionRecord = z.infer<typeof transactionRecordSchema>;
 export type InvoiceRecord = z.infer<typeof invoiceRecordSchema>;
 export type StaffRecord = z.infer<typeof staffRecordSchema>;
+export type ServiceLine = z.infer<typeof serviceLineSchema>;
 export type OpsRecord =
   | LeadRecord
   | CustomerRecord
   | SaleRecord
   | TaskRecord
+  | MeetingRecord
+  | CallRecord
   | ProjectRecord
   | InventoryRecord
   | TransactionRecord
@@ -254,6 +340,8 @@ export interface OpsRecordMap {
   customers: CustomerRecord;
   sales: SaleRecord;
   tasks: TaskRecord;
+  meetings: MeetingRecord;
+  calls: CallRecord;
   projects: ProjectRecord;
   inventory: InventoryRecord;
   transactions: TransactionRecord;
@@ -277,6 +365,8 @@ export function parseOpsUpdate(
     CustomerDraft &
     SaleDraft &
     TaskDraft &
+    MeetingDraft &
+    CallDraft &
     ProjectDraft &
     InventoryDraft &
     TransactionDraft &
@@ -288,6 +378,8 @@ export function parseOpsUpdate(
       CustomerDraft &
       SaleDraft &
       TaskDraft &
+      MeetingDraft &
+      CallDraft &
       ProjectDraft &
       InventoryDraft &
       TransactionDraft &
@@ -333,6 +425,7 @@ export const accountUpdateSchema = z
     role: z.enum(ROLE_IDS),
     tenants: z.array(z.enum(TENANT_IDS)),
     status: accountStatusSchema,
+    password: accountPasswordSchema,
   })
   .partial();
 

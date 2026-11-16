@@ -352,11 +352,12 @@ export async function updateAccount(
         throw new AccountError(409, "CONFLICT", "An account with that email already exists");
       }
       const service = createServiceClient();
-      const authId = email === current.email ? null : await authIdFor(id);
-      if (authId) {
+      const authId = await authIdFor(id);
+      const emailChanged = email !== current.email;
+      if (authId && (emailChanged || payload.password)) {
         const { error: authError } = await service.auth.admin.updateUserById(authId, {
-          email,
-          email_confirm: true,
+          ...(emailChanged ? { email, email_confirm: true } : {}),
+          ...(payload.password ? { password: payload.password } : {}),
         });
         if (authError) {
           if (authEmailTaken(authError)) {
@@ -370,7 +371,7 @@ export async function updateAccount(
         .update({ name, email, status })
         .eq("id", id);
       if (error) {
-        if (authId) {
+        if (authId && emailChanged) {
           await service.auth.admin
             .updateUserById(authId, { email: current.email, email_confirm: true })
             .catch((revert) => console.error("[d12] auth email revert failed", revert));
@@ -382,6 +383,9 @@ export async function updateAccount(
       }
       await replaceGrants(id, role, tenants, actor);
       await writeAudit("account.updated", actor, id, tenants[0] ?? null, `${name} · ${role}`);
+      if (payload.password) {
+        await writeAudit("account.password_set", actor, id, tenants[0] ?? null, name);
+      }
 
       const { accounts } = await listAccounts();
       return accounts.find((account) => account.id === id) ?? { ...current, role, tenants };
@@ -412,6 +416,16 @@ export async function updateAccount(
     tenantId: tenants[0] ?? null,
     detail: `${name} · ${role}`,
   });
+  if (payload.password) {
+    store.passwordHashes[id] = hashPassword(payload.password);
+    pushAudit({
+      action: "account.password_set",
+      actor,
+      target: id,
+      tenantId: tenants[0] ?? null,
+      detail: name,
+    });
+  }
   return updated;
 }
 

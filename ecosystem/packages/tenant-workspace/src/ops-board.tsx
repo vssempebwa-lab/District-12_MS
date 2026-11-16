@@ -5,6 +5,7 @@ import Link from "next/link";
 import {
   AlertTriangle,
   ArrowDownRight,
+  ArrowRightLeft,
   CalendarClock,
   FileText,
   Pencil,
@@ -16,7 +17,7 @@ import {
   UsersRound,
   Wallet,
 } from "lucide-react";
-import type { OpsEntity } from "@d12/contracts";
+import type { OpsEntity, ServiceLine, TenantId } from "@d12/contracts";
 import {
   Alert,
   Badge,
@@ -38,7 +39,7 @@ import {
   type Tone,
 } from "@d12/ui";
 import {
-  ENTITY_CONFIG,
+  entityConfigFor,
   type ColumnConfig,
   type EntityConfig,
   type FieldConfig,
@@ -55,11 +56,32 @@ export interface OpsBoardProps {
   canSync?: boolean;
   /** Set for employees: the board only holds work attributed to this person. */
   personalName?: string;
+  /** Selects tenant-specific forms without changing other subsidiaries. */
+  tenantId?: TenantId;
+  /** Mariz leads can be turned into customer accounts in one step. */
+  canConvertLeads?: boolean;
 }
 
 function text(value: unknown): string {
   if (value === null || value === undefined) return "";
   return String(value);
+}
+
+function parseServices(value: unknown): ServiceLine[] {
+  try {
+    const parsed = typeof value === "string" ? (JSON.parse(value) as unknown) : value;
+    if (!Array.isArray(parsed)) return [];
+    return parsed
+      .filter((line): line is Record<string, unknown> => typeof line === "object" && line !== null)
+      .map((line) => ({ service: String(line.service ?? ""), amount: Number(line.amount ?? 0) }))
+      .filter((line) => line.service);
+  } catch {
+    return [];
+  }
+}
+
+function servicesTotal(lines: ServiceLine[]): number {
+  return lines.reduce((sum, line) => sum + Number(line.amount ?? 0), 0);
 }
 
 function sortRows(rows: EntityRow[]): EntityRow[] {
@@ -76,24 +98,31 @@ function toneFor(value: string): Tone {
     case "done":
     case "completed":
     case "income":
+    case "held":
+    case "connected":
+    case "closed":
       return "success";
     case "qualified":
     case "growth":
     case "in_progress":
     case "planned":
     case "contract":
+    case "scheduled":
+    case "inbound":
       return "info";
     case "contacted":
     case "pending":
     case "medium":
     case "on_hold":
     case "on_leave":
+    case "follow_up":
       return "warning";
     case "high":
     case "refunded":
     case "lost":
     case "cancelled":
     case "expense":
+    case "missed":
       return "danger";
     case "key":
       return "brand";
@@ -111,7 +140,8 @@ function ownerKey(config: EntityConfig): "owner" | "assignee" | null {
 function defaultForm(config: EntityConfig, personalName?: string): Record<string, string> {
   const form: Record<string, string> = {};
   for (const field of config.fields) {
-    form[field.key] = field.type === "number" ? "0" : "";
+    form[field.key] =
+      field.type === "number" ? "0" : field.type === "services" ? "[]" : "";
   }
   for (const [key, value] of Object.entries(config.defaults)) {
     form[key] = String(value);
@@ -124,7 +154,10 @@ function defaultForm(config: EntityConfig, personalName?: string): Record<string
 function rowToForm(row: EntityRow, config: EntityConfig): Record<string, string> {
   const form = defaultForm(config);
   for (const field of config.fields) {
-    form[field.key] = text(row[field.key]);
+    form[field.key] =
+      field.type === "services"
+        ? JSON.stringify(Array.isArray(row[field.key]) ? row[field.key] : [])
+        : text(row[field.key]);
   }
   return form;
 }
@@ -133,7 +166,12 @@ function buildPayload(config: EntityConfig, form: Record<string, string>): Recor
   const payload: Record<string, unknown> = {};
   for (const field of config.fields) {
     const raw = form[field.key] ?? "";
-    payload[field.key] = field.type === "number" ? Number(raw === "" ? 0 : raw) : raw;
+    payload[field.key] =
+      field.type === "number"
+        ? Number(raw === "" ? 0 : raw)
+        : field.type === "services"
+          ? parseServices(raw)
+          : raw;
   }
   return payload;
 }
@@ -144,6 +182,8 @@ function sublineFor(row: EntityRow, config: EntityConfig): string {
     customers: ["company", "email", "phone"],
     sales: ["customerName", "channel"],
     tasks: ["related", "assignee"],
+    meetings: ["location", "attendees"],
+    calls: ["company", "phone"],
     projects: ["client", "owner"],
     inventory: ["sku", "category", "supplier"],
     transactions: ["counterparty", "category", "reference"],
@@ -349,6 +389,24 @@ function renderCell(row: EntityRow, column: ColumnConfig, config: EntityConfig, 
     );
   }
 
+  if (column.kind === "services") {
+    const lines = parseServices(row[column.key]);
+    if (!lines.length) return <span className="text-ink-mute">—</span>;
+    const labelField = config.fields.find((field) => field.key === column.key);
+    const names = lines.map(
+      (line) =>
+        labelField?.options?.find((option) => option.value === line.service)?.label ??
+        titleCase(line.service.replace(/_/g, " ")),
+    );
+    const summary =
+      names.length <= 2 ? names.join(", ") : `${names.slice(0, 2).join(", ")} +${names.length - 2}`;
+    return (
+      <div className="max-w-[220px]" title={names.join(", ")}>
+        <span className="block truncate text-xs text-ink-soft">{summary}</span>
+        <span className="block text-[11px] text-ink-mute">{formatUgx(servicesTotal(lines))}</span>
+      </div>
+    );
+  }
   if (column.kind === "currency") {
     return <span className="whitespace-nowrap font-medium">{formatUgx(Number(value || 0))}</span>;
   }
@@ -371,14 +429,78 @@ function renderCell(row: EntityRow, column: ColumnConfig, config: EntityConfig, 
   return <span className="text-sm">{value || "—"}</span>;
 }
 
+function ServicesField({
+  field,
+  value,
+  onChange,
+}: {
+  field: FieldConfig;
+  value: string;
+  onChange: (value: string) => void;
+}) {
+  const selected = parseServices(value);
+  const setLines = (lines: ServiceLine[]) => onChange(JSON.stringify(lines));
+
+  function toggle(key: string): void {
+    setLines(
+      selected.some((line) => line.service === key)
+        ? selected.filter((line) => line.service !== key)
+        : [...selected, { service: key, amount: 0 }],
+    );
+  }
+
+  function setAmount(key: string, amount: number): void {
+    setLines(selected.map((line) => (line.service === key ? { ...line, amount } : line)));
+  }
+
+  return (
+    <div className="space-y-1.5 rounded-lg border border-line p-3">
+      {field.options?.map((option) => {
+        const checked = selected.some((line) => line.service === option.value);
+        const amount = selected.find((line) => line.service === option.value)?.amount ?? 0;
+        return (
+          <div key={option.value} className="flex flex-wrap items-center gap-2">
+            <label className="flex min-w-0 flex-1 items-center gap-2 text-xs text-ink">
+              <input
+                type="checkbox"
+                checked={checked}
+                onChange={() => toggle(option.value)}
+                className="h-3.5 w-3.5 shrink-0 rounded border-line accent-navy"
+              />
+              <span className="min-w-0">{option.label}</span>
+            </label>
+            {checked ? (
+              <input
+                type="number"
+                min={0}
+                step="any"
+                value={amount}
+                onChange={(event) => setAmount(option.value, Number(event.target.value))}
+                placeholder="Agreed value (UGX)"
+                aria-label={`${option.label} agreed value`}
+                className="h-8 w-40 rounded-md border border-line bg-white px-2 text-xs text-ink outline-none focus:border-navy/40"
+              />
+            ) : null}
+          </div>
+        );
+      })}
+      <p className="border-t border-line pt-1.5 text-[11px] font-semibold text-ink-soft">
+        Total agreed value: {formatUgx(servicesTotal(selected))}
+      </p>
+    </div>
+  );
+}
+
 export function OpsBoard({
   entity,
   records,
   canWrite,
   canSync = false,
   personalName,
+  tenantId,
+  canConvertLeads = false,
 }: OpsBoardProps) {
-  const config = ENTITY_CONFIG[entity];
+  const config = entityConfigFor(entity, tenantId);
   const lockedKey = personalName ? ownerKey(config) : null;
   const [rows, setRows] = useState<EntityRow[]>(() => sortRows(records));
   const [search, setSearch] = useState("");
@@ -390,6 +512,10 @@ export function OpsBoard({
   const [deleting, setDeleting] = useState<EntityRow | null>(null);
   const [deletePending, setDeletePending] = useState(false);
   const [deleteError, setDeleteError] = useState<string | null>(null);
+  const [converting, setConverting] = useState<EntityRow | null>(null);
+  const [convertPending, setConvertPending] = useState(false);
+  const [convertError, setConvertError] = useState<string | null>(null);
+  const [notice, setNotice] = useState<string | null>(null);
 
   const filterField = config.fields.find((field) => field.key === config.filterKey);
   const filterOptions = filterField?.options ?? [];
@@ -477,6 +603,58 @@ export function OpsBoard({
     }
   }
 
+  async function convertLead(): Promise<void> {
+    if (!converting) return;
+    setConvertPending(true);
+    setConvertError(null);
+    try {
+      const today = new Date().toISOString().slice(0, 10);
+      const customerResponse = await fetch("/api/ops/customers", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({
+          name: text(converting.name),
+          company: text(converting.company),
+          email: text(converting.email),
+          phone: text(converting.phone),
+          tier: "standard",
+          status: "active",
+          owner: text(converting.owner),
+          lifetimeValue: Number(converting.value ?? 0),
+          lastOrder: "",
+          issueOn: today,
+          services: [],
+        }),
+      });
+      const customerBody = (await customerResponse.json().catch(() => null)) as
+        | { ok?: boolean; record?: EntityRow; error?: { message?: string } }
+        | null;
+      if (!customerResponse.ok || !customerBody?.ok || !customerBody.record) {
+        setConvertError(errorMessage(customerBody));
+        return;
+      }
+      const leadResponse = await fetch(`/api/ops/leads/${converting.id}`, {
+        method: "PATCH",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ stage: "won" }),
+      });
+      if (leadResponse.ok) {
+        setRows((previous) =>
+          previous.map((row) => (row.id === converting.id ? { ...row, stage: "won" } : row)),
+        );
+      }
+      setNotice(
+        `${text(converting.name)} is now a customer${leadResponse.ok ? " and the lead is marked won" : ""}.`,
+      );
+      setConverting(null);
+      void syncTelemetry();
+    } catch {
+      setConvertError("Network error — the workspace could not be reached.");
+    } finally {
+      setConvertPending(false);
+    }
+  }
+
   const deletingLabel = deleting ? text(deleting[config.primaryKey]) || config.singular : config.singular;
   const formId = `entity-form-${entity}`;
   const summary = summaryCards(entity, rows);
@@ -509,6 +687,8 @@ export function OpsBoard({
           </>
         }
       />
+
+      {notice ? <Alert tone="success">{notice}</Alert> : null}
 
       {summary.length ? (
         <div className="grid gap-3 sm:grid-cols-3">
@@ -629,6 +809,23 @@ export function OpsBoard({
                 {canWrite ? (
                   <Td className="text-right">
                     <div className="flex items-center justify-end gap-1">
+                      {canConvertLeads &&
+                      entity === "leads" &&
+                      text(row.stage) !== "won" &&
+                      text(row.stage) !== "lost" ? (
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setConvertError(null);
+                            setConverting(row);
+                          }}
+                          aria-label="Convert lead to customer"
+                          title="Convert to customer"
+                          className="flex h-7 w-7 items-center justify-center rounded-md text-ink-mute transition-colors hover:bg-emerald-50 hover:text-emerald-700"
+                        >
+                          <ArrowRightLeft className="h-3.5 w-3.5" />
+                        </button>
+                      ) : null}
                       <button
                         type="button"
                         onClick={() => openEdit(row)}
@@ -686,11 +883,21 @@ export function OpsBoard({
               label={field.required ? `${field.label} *` : field.label}
               className={field.wide ? "sm:col-span-2" : undefined}
             >
-              {renderField(
-                field,
-                form[field.key] ?? "",
-                (value) => setForm((previous) => ({ ...previous, [field.key]: value })),
-                field.key === lockedKey,
+              {field.type === "services" ? (
+                <ServicesField
+                  field={field}
+                  value={form[field.key] ?? "[]"}
+                  onChange={(value) =>
+                    setForm((previous) => ({ ...previous, [field.key]: value }))
+                  }
+                />
+              ) : (
+                renderField(
+                  field,
+                  form[field.key] ?? "",
+                  (value) => setForm((previous) => ({ ...previous, [field.key]: value })),
+                  field.key === lockedKey,
+                )
               )}
               {field.key === lockedKey ? (
                 <p className="mt-1 text-[11px] leading-relaxed text-ink-mute">
@@ -744,6 +951,43 @@ export function OpsBoard({
         {deleteError ? (
           <div className="mt-3">
             <Alert tone="danger">{deleteError}</Alert>
+          </div>
+        ) : null}
+      </Modal>
+
+      <Modal
+        open={converting !== null}
+        title="Convert lead to customer"
+        description="Creates a customer with the lead's details and marks the lead as won."
+        onClose={() => {
+          if (!convertPending) setConverting(null);
+        }}
+        footer={
+          <>
+            <Button
+              type="button"
+              variant="secondary"
+              onClick={() => setConverting(null)}
+              disabled={convertPending}
+            >
+              Keep as lead
+            </Button>
+            <Button type="button" onClick={convertLead} disabled={convertPending}>
+              {convertPending ? "Converting" : "Convert to customer"}
+            </Button>
+          </>
+        }
+      >
+        {converting ? (
+          <div className="space-y-2">
+            <p className="text-sm text-ink">
+              Turn <span className="font-semibold">{text(converting.name)}</span> into a customer?
+            </p>
+            <p className="text-xs text-ink-soft">
+              {text(converting.company) || "No company"} · Owner {text(converting.owner) || "unassigned"} ·{" "}
+              {formatUgx(Number(converting.value ?? 0))}
+            </p>
+            {convertError ? <Alert tone="danger">{convertError}</Alert> : null}
           </div>
         ) : null}
       </Modal>

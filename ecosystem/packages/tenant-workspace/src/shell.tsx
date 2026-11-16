@@ -8,6 +8,7 @@ import {
   BarChart3,
   Bell,
   Building2,
+  CalendarDays,
   CheckSquare,
   ChevronDown,
   Clock3,
@@ -16,6 +17,7 @@ import {
   LayoutDashboard,
   LogOut,
   Package,
+  PhoneCall,
   Receipt,
   Send,
   Settings,
@@ -26,7 +28,7 @@ import {
   Wallet,
   type LucideIcon,
 } from "lucide-react";
-import { hubAppUrl, type TenantMeta } from "@d12/contracts";
+import { hubAppUrl, type TenantId, type TenantMeta } from "@d12/contracts";
 import { Avatar, BrandMark, cn } from "@d12/ui";
 import { allowsAll } from "./permissions";
 
@@ -35,6 +37,7 @@ interface NavItem {
   label: string;
   icon: LucideIcon;
   permissions?: string[];
+  tenants?: TenantId[];
 }
 
 const ITEMS: NavItem[] = [
@@ -43,6 +46,8 @@ const ITEMS: NavItem[] = [
   { href: "/customers", label: "Customers", icon: Building2, permissions: ["customers.read"] },
   { href: "/sales", label: "Sales", icon: Receipt, permissions: ["sales.read"] },
   { href: "/tasks", label: "Tasks", icon: CheckSquare, permissions: ["tasks.read"] },
+  { href: "/meetings", label: "Meetings", icon: CalendarDays, permissions: ["meetings.read"], tenants: ["mariz"] },
+  { href: "/calls", label: "Calls", icon: PhoneCall, permissions: ["calls.read"], tenants: ["mariz"] },
   { href: "/projects", label: "Projects", icon: Folder, permissions: ["projects.read"] },
   { href: "/inventory", label: "Inventory", icon: Package, permissions: ["inventory.read"] },
   { href: "/transactions", label: "Finance", icon: Wallet, permissions: ["transactions.read"] },
@@ -111,7 +116,11 @@ export function TenantShell({
   const [shiftPending, setShiftPending] = useState(false);
   const [shiftNote, setShiftNote] = useState<{ tone: "ok" | "error"; text: string } | null>(null);
   const [menuOpen, setMenuOpen] = useState(false);
-  const items = ITEMS.filter((item) => allowsAll(permissions, item.permissions));
+  const items = ITEMS.filter(
+    (item) =>
+      allowsAll(permissions, item.permissions) &&
+      (!item.tenants || item.tenants.includes(tenant.id)),
+  );
   const activeItem = items.find((item) => isActive(pathname, item.href)) ?? items[0];
   const activeColor = accent || tenant.color;
   const compact = density === "compact";

@@ -5,6 +5,8 @@ import {
   ArrowLeftRight,
   Ban,
   CheckCircle2,
+  Eye,
+  EyeOff,
   Info,
   ShieldCheck,
   Pencil,
@@ -186,7 +188,7 @@ export function HrProvisioning({
         role: state.role,
         tenants: isGlobalRole(state.role) ? [...TENANT_IDS] : state.tenants,
         status: state.status,
-        ...(state.mode === "create" ? { password: state.password } : {}),
+        ...(state.password ? { password: state.password } : {}),
       };
       const response = await fetch(
         state.mode === "create" ? "/api/hr/accounts" : `/api/hr/accounts/${state.accountId}`,
@@ -206,7 +208,9 @@ export function HrProvisioning({
       setNotice(
         state.mode === "create"
           ? `${body.account.name} can now sign in as ${body.account.roleLabel}.`
-          : `${body.account.name} updated.`,
+          : state.password
+            ? `${body.account.name} updated · new password set.`
+            : `${body.account.name} updated.`,
       );
       await refreshAudit();
     } finally {
@@ -638,7 +642,9 @@ function AccountEditor({
   const [draft, setDraft] = useState(state);
   const [confirmPassword, setConfirmPassword] = useState("");
   const [localError, setLocalError] = useState<string | null>(null);
+  const [showPassword, setShowPassword] = useState(false);
   const global = isGlobalRole(draft.role);
+  const canPeek = draft.tenants.includes("mariz");
 
   function toggleTenant(id: TenantId): void {
     setDraft((current) => ({
@@ -655,9 +661,13 @@ function AccountEditor({
       setLocalError("Name and email are required.");
       return;
     }
-    if (draft.mode === "create") {
+    if (draft.mode === "create" || draft.password) {
       if (draft.password.length < 8) {
-        setLocalError("Set an initial password of at least 8 characters.");
+        setLocalError(
+          draft.mode === "create"
+            ? "Set an initial password of at least 8 characters."
+            : "The new password must be at least 8 characters.",
+        );
         return;
       }
       if (draft.password !== confirmPassword) {
@@ -680,7 +690,7 @@ function AccountEditor({
       description={
         draft.mode === "create"
           ? "Set the password they will sign in with; the role and subsidiaries decide what they can reach."
-          : "Roles and subsidiaries decide where this person lands after sign-in."
+          : "Roles and subsidiaries decide where this person lands after sign-in. Set a new password only if you need to change it."
       }
       onClose={onClose}
       footer={
@@ -745,32 +755,60 @@ function AccountEditor({
           </Field>
         </div>
 
-        {draft.mode === "create" ? (
-          <div className="grid gap-3 sm:grid-cols-2">
-            <Field label="Initial password">
+        <div className="grid gap-3 sm:grid-cols-2">
+          <Field label={draft.mode === "create" ? "Initial password" : "New password (optional)"}>
+            <div className="relative">
               <Input
-                type="password"
+                type={showPassword ? "text" : "password"}
                 value={draft.password}
                 onChange={(event) => setDraft({ ...draft, password: event.target.value })}
-                placeholder="At least 8 characters"
+                placeholder={draft.mode === "create" ? "At least 8 characters" : "Leave blank to keep current"}
                 autoComplete="new-password"
+                className={canPeek ? "pr-10" : undefined}
               />
-            </Field>
-            <Field label="Confirm password">
+              {canPeek ? (
+                <button
+                  type="button"
+                  onClick={() => setShowPassword((visible) => !visible)}
+                  aria-label={showPassword ? "Hide password" : "Show password"}
+                  title={showPassword ? "Hide password" : "Show password"}
+                  className="absolute right-1.5 top-1/2 flex h-8 w-8 -translate-y-1/2 items-center justify-center rounded-md text-ink-mute transition-colors hover:bg-canvas hover:text-ink"
+                >
+                  {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                </button>
+              ) : null}
+            </div>
+          </Field>
+          <Field label="Confirm password">
+            <div className="relative">
               <Input
-                type="password"
+                type={showPassword ? "text" : "password"}
                 value={confirmPassword}
                 onChange={(event) => setConfirmPassword(event.target.value)}
-                placeholder="Repeat the password"
+                placeholder={draft.mode === "create" ? "Repeat the password" : "Repeat the new password"}
                 autoComplete="new-password"
+                className={canPeek ? "pr-10" : undefined}
               />
-            </Field>
-            <p className="text-[11px] leading-relaxed text-ink-soft sm:col-span-2">
-              Share this password with {draft.name.trim() || "the new user"} privately. It unlocks
-              only the role and subsidiaries selected above.
-            </p>
-          </div>
-        ) : null}
+              {canPeek ? (
+                <button
+                  type="button"
+                  onClick={() => setShowPassword((visible) => !visible)}
+                  aria-label={showPassword ? "Hide password" : "Show password"}
+                  title={showPassword ? "Hide password" : "Show password"}
+                  className="absolute right-1.5 top-1/2 flex h-8 w-8 -translate-y-1/2 items-center justify-center rounded-md text-ink-mute transition-colors hover:bg-canvas hover:text-ink"
+                >
+                  {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                </button>
+              ) : null}
+            </div>
+          </Field>
+          <p className="text-[11px] leading-relaxed text-ink-soft sm:col-span-2">
+            {draft.mode === "create"
+              ? `Share this password with ${draft.name.trim() || "the new user"} privately. It unlocks only the role and subsidiaries selected above.`
+              : `Leave blank to keep ${draft.name.trim() || "their"} current password. If you set one, share it with them privately.`}
+            {canPeek ? " Use the eye icon to check it before sharing." : ""}
+          </p>
+        </div>
 
         <div>
           <p className="mb-1 text-[11px] font-semibold uppercase tracking-wide text-ink-soft">

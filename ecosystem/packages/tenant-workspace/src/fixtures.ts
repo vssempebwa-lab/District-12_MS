@@ -1,9 +1,11 @@
 import {
   TENANTS,
+  type CallRecord,
   type CustomerRecord,
   type InventoryRecord,
   type InvoiceRecord,
   type LeadRecord,
+  type MeetingRecord,
   type OpsEntity,
   type ProjectRecord,
   type SaleRecord,
@@ -144,6 +146,8 @@ export interface TenantRecords {
   customers: CustomerRecord[];
   sales: SaleRecord[];
   tasks: TaskRecord[];
+  meetings: MeetingRecord[];
+  calls: CallRecord[];
   projects: ProjectRecord[];
   inventory: InventoryRecord[];
   transactions: TransactionRecord[];
@@ -244,6 +248,7 @@ export function seedRecords(tenantId: TenantId): TenantRecords {
     value: Math.round(fixture.leadValue * scale),
     owner: fixture.team[index % fixture.team.length],
     nextStep,
+    description: `${name} is exploring ${fixture.offers[index % fixture.offers.length]} through ${source.toLowerCase()}. Worker: ${fixture.team[index % fixture.team.length]}.`,
   }));
 
   const customers: CustomerRecord[] = fixture.clients.map((client, index) => ({
@@ -260,6 +265,15 @@ export function seedRecords(tenantId: TenantId): TenantRecords {
     owner: fixture.team[index % fixture.team.length],
     lifetimeValue: Math.round(fixture.saleSize * (6 + index * 1.5)),
     lastOrder: dateOffset(4 + index * 3),
+    issueOn: dateOffset(60 - index * 7),
+    services: [
+      {
+        service: ["recruitment", "call_support", "consultancy", "software_development", "digital_marketing"][
+          index % 5
+        ],
+        amount: Math.round(fixture.saleSize * (2 + index * 0.4)),
+      },
+    ],
   }));
 
   const sales: SaleRecord[] = SALE_PLAN.map(([offerIndex, customerIndex, status, daysAgo], index) => ({
@@ -288,6 +302,8 @@ export function seedRecords(tenantId: TenantId): TenantRecords {
     priority: priority as TaskRecord["priority"],
     status: status as TaskRecord["status"],
     related,
+    dueTime: ["09:00", "11:30", "14:00", "16:30"][index % 4],
+    description: `${title}. Owner: ${fixture.team[index % fixture.team.length]}. Add the detail the person doing the work needs.`,
   }));
 
   const projectStatuses: ProjectRecord["status"][] = [
@@ -392,7 +408,76 @@ export function seedRecords(tenantId: TenantId): TenantRecords {
     };
   });
 
-  return { leads, customers, sales, tasks, projects, inventory, transactions, invoices, staff };
+  const meetingPlan: Array<[string, number, string, MeetingRecord["status"], string]> = [
+    ["Weekly delivery stand-up", 1, "09:00", "scheduled", "Conference room"],
+    [`Client check-in — ${fixture.clients[0]}`, 4, "11:00", "held", "Online"],
+    ["Pipeline review", 8, "14:30", "held", "Boardroom"],
+    ["Quarterly planning", 15, "10:00", "scheduled", "Managing director's office"],
+  ];
+  const meetings: MeetingRecord[] = meetingPlan.map(([title, daysAgo, startTime, status, location], index) => ({
+    id: `meet_${tenantId}_${index + 1}`,
+    tenantId,
+    createdAt: dateOffset(daysAgo + 2),
+    updatedAt: isoOffset(Math.max(0, daysAgo - 1), 12),
+    title,
+    meetingOn: dateOffset(daysAgo),
+    startTime,
+    endTime: startTime === "14:30" ? "15:30" : "10:00",
+    location,
+    attendees: fixture.team.slice(0, 2 + (index % 2)).join(", "),
+    status,
+    owner,
+    followUpOn: dateOffset(Math.max(0, daysAgo - 3)),
+    agenda: "Progress against commitments, blockers and the next decision.",
+    notes:
+      status === "held"
+        ? "Agreed the next steps and assigned the follow-ups to the owner."
+        : "Agenda shared with attendees ahead of the meeting.",
+  }));
+
+  const callPlan: Array<[string, CallRecord["direction"], CallRecord["outcome"], number, string]> = [
+    ["Account follow-up", "outbound", "connected", 1, "12"],
+    ["Renewal confirmation", "inbound", "connected", 2, "08"],
+    ["Delivery escalation", "inbound", "follow_up", 5, "06"],
+    ["Price enquiry", "outbound", "missed", 7, "05"],
+  ];
+  const calls: CallRecord[] = callPlan.map(([purpose, direction, outcome, daysAgo, duration], index) => ({
+    id: `call_${tenantId}_${index + 1}`,
+    tenantId,
+    createdAt: isoOffset(daysAgo, 10),
+    updatedAt: isoOffset(daysAgo, 10),
+    contactName: fixture.team[index % fixture.team.length],
+    company: fixture.clients[index % fixture.clients.length],
+    phone: "+256 7" + (72000000 + index * 345678),
+    direction,
+    callOn: dateOffset(daysAgo),
+    callTime: ["09:30", "11:15", "14:45", "16:00"][index % 4],
+    durationMin: Number(duration),
+    purpose,
+    outcome,
+    owner,
+    followUpOn: dateOffset(Math.max(0, daysAgo - 2)),
+    notes:
+      outcome === "missed"
+        ? "No answer; try again on the follow-up date."
+        : outcome === "follow_up"
+          ? "Client needs the revised plan before deciding."
+          : "Confirmed the details and logged the next action.",
+  }));
+
+  return {
+    leads,
+    customers,
+    sales,
+    tasks,
+    meetings,
+    calls,
+    projects,
+    inventory,
+    transactions,
+    invoices,
+    staff,
+  };
 }
 
 export function entityRecords(records: TenantRecords, entity: OpsEntity): TenantRecords[OpsEntity] {

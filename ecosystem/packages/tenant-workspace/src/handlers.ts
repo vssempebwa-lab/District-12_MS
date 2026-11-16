@@ -39,8 +39,11 @@ function validationFailure(error: ZodError): NextResponse {
   });
 }
 
-function isKnownEntity(rawEntity: string): rawEntity is OpsEntity {
-  return isOpsEntity(rawEntity);
+const MARIZ_ONLY_ENTITIES: ReadonlySet<string> = new Set(["meetings", "calls"]);
+
+function isKnownEntity(rawEntity: string, tenantId: TenantId): rawEntity is OpsEntity {
+  if (!isOpsEntity(rawEntity)) return false;
+  return tenantId === "mariz" || !MARIZ_ONLY_ENTITIES.has(rawEntity);
 }
 
 export async function handleList(
@@ -48,7 +51,7 @@ export async function handleList(
   tenantId: TenantId,
   rawEntity: string,
 ): Promise<NextResponse> {
-  if (!isKnownEntity(rawEntity)) return jsonError("NOT_FOUND", "Unknown record type", 404);
+  if (!isKnownEntity(rawEntity, tenantId)) return jsonError("NOT_FOUND", "Unknown record type", 404);
   const guard = await guardPermission(request, `${rawEntity}.read`, tenantId);
   if (!guard.ok) return guardFailure(guard);
 
@@ -61,7 +64,7 @@ export async function handleCreate(
   tenantId: TenantId,
   rawEntity: string,
 ): Promise<NextResponse> {
-  if (!isKnownEntity(rawEntity)) return jsonError("NOT_FOUND", "Unknown record type", 404);
+  if (!isKnownEntity(rawEntity, tenantId)) return jsonError("NOT_FOUND", "Unknown record type", 404);
   const guard = await guardPermission(request, `${rawEntity}.write`, tenantId);
   if (!guard.ok) return guardFailure(guard);
 
@@ -82,7 +85,7 @@ export async function handleUpdate(
   rawEntity: string,
   id: string,
 ): Promise<NextResponse> {
-  if (!isKnownEntity(rawEntity)) return jsonError("NOT_FOUND", "Unknown record type", 404);
+  if (!isKnownEntity(rawEntity, tenantId)) return jsonError("NOT_FOUND", "Unknown record type", 404);
   const guard = await guardPermission(request, `${rawEntity}.write`, tenantId);
   if (!guard.ok) return guardFailure(guard);
 
@@ -104,7 +107,7 @@ export async function handleDelete(
   rawEntity: string,
   id: string,
 ): Promise<NextResponse> {
-  if (!isKnownEntity(rawEntity)) return jsonError("NOT_FOUND", "Unknown record type", 404);
+  if (!isKnownEntity(rawEntity, tenantId)) return jsonError("NOT_FOUND", "Unknown record type", 404);
   const guard = await guardPermission(request, `${rawEntity}.write`, tenantId);
   if (!guard.ok) return guardFailure(guard);
 
