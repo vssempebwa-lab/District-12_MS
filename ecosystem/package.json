@@ -23,6 +23,8 @@
     "build:all": "npm run build:hub && npm run build:passito && npm run build:mariz && npm run build:rub-shoots && npm run build:shop-for-me && npm run build:expresso-point",
     "typecheck": "tsc -p tsconfig.json --noEmit && tsc -p apps/hub/tsconfig.json --noEmit && tsc -p apps/passito/tsconfig.json --noEmit && tsc -p apps/mariz/tsconfig.json --noEmit && tsc -p apps/rub-shoots/tsconfig.json --noEmit && tsc -p apps/shop-for-me/tsconfig.json --noEmit && tsc -p apps/expresso-point/tsconfig.json --noEmit",
     "scaffold:tenant": "node scripts/scaffold-tenant.mjs",
+    "check:deploy": "node scripts/check-deploy-env.mjs",
+    "link:seed-users": "node scripts/link-seed-users.mjs",
     "telemetry:worker": "node apps/passito/worker/telemetry.mjs"
   },
   "dependencies": {

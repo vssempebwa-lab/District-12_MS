@@ -1,6 +1,8 @@
+# District 12 deploys six independent sites from ecosystem/apps/<app>, not the
+# repository root. Configure each Netlify site with:
+#   Base directory:    ecosystem
+#   Package directory: apps/hub | apps/passito | apps/mariz | ...
+# Build settings live in ecosystem/apps/<app>/netlify.toml.
 [build]
-command = "npx next build"
-publish = ".next"
-
-[[plugins]]
-package = "@netlify/plugin-nextjs"
+command = "node -e \"console.error('No root site: set Base directory to ecosystem and Package directory to apps/<app>.');process.exit(1)\""
+publish = "."

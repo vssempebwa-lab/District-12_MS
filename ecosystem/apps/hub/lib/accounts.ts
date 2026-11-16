@@ -482,12 +482,6 @@ export async function transferAccount(
   return updated;
 }
 
-export function demoEmailExists(email: string): boolean {
-  return getStore().accounts.some(
-    (candidate) => candidate.email.toLowerCase() === email.trim().toLowerCase(),
-  );
-}
-
 export function demoSessionUser(email: string, password = ""): SessionUser | null {
   const store = getStore();
   const account = store.accounts.find(

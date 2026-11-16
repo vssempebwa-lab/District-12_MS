@@ -200,8 +200,10 @@ Policies:
 
 ## 8. Production hardening checklist
 
-1. Remove `D12_DEMO_MODE`; wire `/api/auth/login` to Supabase Auth and load
-   grants by `auth_id`.
+1. Set `D12_DEMO_MODE=false` (production already defaults to off), provide a
+   32+ character `D12_SESSION_SECRET`, and link seeded accounts with
+   `021_link_seed_auth_users.sql` or `npm run link:seed-users`. Login then goes
+   through Supabase Auth and loads grants by `auth_id`.
 2. Stop using the service role inside tenant apps. Either mint Supabase JWTs
    with the user's `sub`/roles for the tenant, or proxy all tenant data through
    a hub gateway. RLS is only meaningful when requests are not privileged.

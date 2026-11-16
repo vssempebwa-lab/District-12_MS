@@ -37,14 +37,23 @@ export interface SessionClaims extends JwtPayload {
 }
 
 export function isDemoMode(): boolean {
-  return process.env.D12_DEMO_MODE !== "false";
+  const flag = process.env.D12_DEMO_MODE?.trim().toLowerCase();
+  if (flag === "true") return true;
+  if (flag === "false") return false;
+  // Development keeps the seeded demo directory, production never does.
+  return process.env.NODE_ENV !== "production";
 }
 
 export function getSessionSecret(): string {
   const secret = process.env.D12_SESSION_SECRET?.trim();
-  if (secret && secret.length >= 32) return secret;
+  if (secret) {
+    if (secret.length < 32) {
+      throw new Error("D12_SESSION_SECRET must be at least 32 characters");
+    }
+    return secret;
+  }
   if (isDemoMode()) return DEV_SECRET;
-  throw new Error("D12_SESSION_SECRET must be set to at least 32 characters when D12_DEMO_MODE=false");
+  throw new Error("D12_SESSION_SECRET must be set to at least 32 characters when demo mode is off");
 }
 
 export function getSessionTtlSeconds(): number {
@@ -158,9 +167,27 @@ export function sessionToView(session: SessionClaims): SessionView {
   };
 }
 
+const COOKIE_DOMAIN_PATTERN = /^\.?(?:[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?\.)+[a-z]{2,}$/;
+
+export function normalizeCookieDomain(raw: string | null | undefined): string | undefined {
+  const value = raw?.trim();
+  if (!value) return undefined;
+  const host = value
+    .replace(/^[a-z][a-z0-9+.-]*:\/\//i, "")
+    .split(/[/?#]/, 1)[0]
+    .split(":")[0]
+    .replace(/\.$/, "")
+    .toLowerCase();
+  if (!COOKIE_DOMAIN_PATTERN.test(host)) {
+    throw new Error(
+      `D12_COOKIE_DOMAIN "${value}" is not a valid cookie domain; use a bare domain such as .district12.co.ug`,
+    );
+  }
+  return host;
+}
+
 function cookieDomain(): string | undefined {
-  const domain = process.env.D12_COOKIE_DOMAIN?.trim();
-  return domain || undefined;
+  return normalizeCookieDomain(process.env.D12_COOKIE_DOMAIN);
 }
 
 export function sessionCookie(token: string, maxAgeSeconds: number = getSessionTtlSeconds()): string {

@@ -1,0 +1,12 @@
+# Netlify site: Mariz Outsourcing
+# Site settings: Base directory = ecosystem, Package directory = apps/mariz
+[build]
+command = "npm run check:deploy && npm run build:mariz"
+publish = "apps/mariz/.next"
+
+[build.environment]
+NODE_VERSION = "20"
+NEXT_TELEMETRY_DISABLED = "1"
+
+[[plugins]]
+package = "@netlify/plugin-nextjs"

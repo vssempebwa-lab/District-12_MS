@@ -1,7 +1,10 @@
 import { redirect } from "next/navigation";
 import {
+  DEMO_ACCOUNTS,
+  DEMO_PASSWORD,
   claimsToUser,
   createSessionToken,
+  isDemoMode,
   landingFor,
   tenantCallbackUrl,
 } from "@d12/auth";
@@ -26,6 +29,13 @@ export default async function LoginPage({
 
   const nextParam = searchParams.next;
   const next = typeof nextParam === "string" && nextParam.startsWith("/") ? nextParam : "";
+
+  const demo = isDemoMode()
+    ? {
+        password: DEMO_PASSWORD,
+        accounts: DEMO_ACCOUNTS.map(({ id, email, title }) => ({ id, email, title })),
+      }
+    : null;
 
   return (
     <main className="relative flex min-h-screen flex-col overflow-hidden bg-canvas">
@@ -88,7 +98,7 @@ export default async function LoginPage({
             </p>
 
             <div className="mt-6">
-              <LoginForm next={next} />
+              <LoginForm next={next} demo={demo} />
             </div>
 
             <p className="mt-6 border-t border-line pt-4 text-center text-[11px] leading-relaxed text-ink-soft">

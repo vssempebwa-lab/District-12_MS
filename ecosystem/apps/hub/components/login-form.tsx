@@ -2,16 +2,20 @@
 
 import { useState } from "react";
 import { ArrowRight, ChevronDown, Loader2, ShieldCheck } from "lucide-react";
-import { DEMO_ACCOUNTS, DEMO_PASSWORD } from "@d12/auth";
 import { Alert } from "@d12/ui";
 
 const labelClass = "block text-[13px] font-medium text-ink-soft";
 const inputClass =
   "mt-1.5 h-11 w-full rounded-lg border border-transparent bg-[#F3F5F8] px-3.5 text-sm text-ink outline-none transition-colors placeholder:text-ink-mute focus:border-brand/30 focus:bg-white focus:ring-4 focus:ring-brand/10";
 
-export function LoginForm({ next }: { next: string }) {
+export interface DemoDirectory {
+  password: string;
+  accounts: Array<{ id: string; email: string; title: string }>;
+}
+
+export function LoginForm({ next, demo }: { next: string; demo?: DemoDirectory | null }) {
   const [email, setEmail] = useState("");
-  const [password, setPassword] = useState(DEMO_PASSWORD);
+  const [password, setPassword] = useState(demo?.password ?? "");
   const [error, setError] = useState<string | null>(null);
   const [pending, setPending] = useState(false);
 
@@ -34,7 +38,7 @@ export function LoginForm({ next }: { next: string }) {
       }
       window.location.assign(body.redirect);
     } catch {
-      setError("Network error — check that the hub is running on port 3100.");
+      setError("Network error — check your connection and try again.");
     } finally {
       setPending(false);
     }
@@ -91,37 +95,39 @@ export function LoginForm({ next }: { next: string }) {
         </div>
       ) : null}
 
-      <details className="group rounded-lg border border-line bg-canvas/70 px-3 py-2">
-        <summary className="flex cursor-pointer list-none items-center justify-between gap-2 text-[10px] font-semibold uppercase tracking-wide text-ink-soft [&::-webkit-details-marker]:hidden">
-          <span className="flex items-center gap-1.5">
-            <ShieldCheck className="h-3 w-3 text-emerald-600" />
-            Demo directory
-          </span>
-          <ChevronDown className="h-3.5 w-3.5 transition-transform group-open:rotate-180" />
-        </summary>
-        <div className="mt-2 max-h-44 space-y-1 overflow-y-auto pr-1">
-          {DEMO_ACCOUNTS.map((account) => (
-            <button
-              key={account.id}
-              type="button"
-              onClick={() => {
-                setEmail(account.email);
-                setPassword(DEMO_PASSWORD);
-                setError(null);
-              }}
-              className="flex w-full items-center justify-between gap-3 rounded-md px-2 py-1.5 text-left transition-colors hover:bg-white"
-            >
-              <span className="min-w-0">
-                <span className="block truncate text-xs font-medium text-ink">{account.email}</span>
-                <span className="block truncate text-[11px] text-ink-mute">{account.title}</span>
-              </span>
-              <span className="shrink-0 text-[10px] font-semibold uppercase tracking-wide text-ink-mute">
-                Use
-              </span>
-            </button>
-          ))}
-        </div>
-      </details>
+      {demo ? (
+        <details className="group rounded-lg border border-line bg-canvas/70 px-3 py-2">
+          <summary className="flex cursor-pointer list-none items-center justify-between gap-2 text-[10px] font-semibold uppercase tracking-wide text-ink-soft [&::-webkit-details-marker]:hidden">
+            <span className="flex items-center gap-1.5">
+              <ShieldCheck className="h-3 w-3 text-emerald-600" />
+              Demo directory
+            </span>
+            <ChevronDown className="h-3.5 w-3.5 transition-transform group-open:rotate-180" />
+          </summary>
+          <div className="mt-2 max-h-44 space-y-1 overflow-y-auto pr-1">
+            {demo.accounts.map((account) => (
+              <button
+                key={account.id}
+                type="button"
+                onClick={() => {
+                  setEmail(account.email);
+                  setPassword(demo.password);
+                  setError(null);
+                }}
+                className="flex w-full items-center justify-between gap-3 rounded-md px-2 py-1.5 text-left transition-colors hover:bg-white"
+              >
+                <span className="min-w-0">
+                  <span className="block truncate text-xs font-medium text-ink">{account.email}</span>
+                  <span className="block truncate text-[11px] text-ink-mute">{account.title}</span>
+                </span>
+                <span className="shrink-0 text-[10px] font-semibold uppercase tracking-wide text-ink-mute">
+                  Use
+                </span>
+              </button>
+            ))}
+          </div>
+        </details>
+      ) : null}
     </form>
   );
 }

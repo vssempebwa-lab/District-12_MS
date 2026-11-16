@@ -1,0 +1,12 @@
+# Netlify site: Rub Shoots Photography
+# Site settings: Base directory = ecosystem, Package directory = apps/rub-shoots
+[build]
+command = "npm run check:deploy && npm run build:rub-shoots"
+publish = "apps/rub-shoots/.next"
+
+[build.environment]
+NODE_VERSION = "20"
+NEXT_TELEMETRY_DISABLED = "1"
+
+[[plugins]]
+package = "@netlify/plugin-nextjs"

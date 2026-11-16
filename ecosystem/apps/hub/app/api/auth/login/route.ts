@@ -9,8 +9,8 @@ import {
   tenantCallbackUrl,
 } from "@d12/auth";
 import { loginSchema } from "@d12/contracts";
-import { hasServiceRoleEnv } from "@d12/db";
-import { authenticateSupabase, demoEmailExists, demoSessionUser } from "@/lib/accounts";
+import { hasServiceRoleEnv, hasSupabaseEnv } from "@d12/db";
+import { authenticateSupabase, demoSessionUser } from "@/lib/accounts";
 import { jsonError, zodDetails } from "@/lib/http";
 
 export async function POST(request: Request): Promise<NextResponse> {
@@ -25,9 +25,21 @@ export async function POST(request: Request): Promise<NextResponse> {
   const { email, password, next } = parsed.data;
 
   try {
-    let user = isDemoMode() ? demoSessionUser(email, password) : null;
-    if (!user && (!isDemoMode() || (!demoEmailExists(email) && hasServiceRoleEnv()))) {
-      user = await authenticateSupabase(email, password);
+    const demo = isDemoMode();
+    const supabaseReady = hasSupabaseEnv() && hasServiceRoleEnv();
+
+    // Demo mode accepts the seeded directory. Everything else must pass
+    // Supabase Auth and resolve to an active IAM account.
+    let user = demo ? demoSessionUser(email, password) : null;
+    if (!user) {
+      if (!supabaseReady) {
+        if (!demo) {
+          console.error("[d12] sign-in requires Supabase Auth and service-role credentials");
+          return jsonError("INTERNAL", "Sign-in is unavailable right now", 500);
+        }
+      } else {
+        user = await authenticateSupabase(email, password);
+      }
     }
 
     if (!user) {

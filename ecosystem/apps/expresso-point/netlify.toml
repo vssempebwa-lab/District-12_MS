@@ -1,0 +1,12 @@
+# Netlify site: Expresso Point
+# Site settings: Base directory = ecosystem, Package directory = apps/expresso-point
+[build]
+command = "npm run check:deploy && npm run build:expresso-point"
+publish = "apps/expresso-point/.next"
+
+[build.environment]
+NODE_VERSION = "20"
+NEXT_TELEMETRY_DISABLED = "1"
+
+[[plugins]]
+package = "@netlify/plugin-nextjs"

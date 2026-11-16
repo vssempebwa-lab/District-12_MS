@@ -46,9 +46,10 @@ npm run dev:hub        # http://localhost:3100
 npm run dev:passito    # http://localhost:3001
 ```
 
-With `D12_DEMO_MODE=true` (the default) the apps run entirely on seeded
-fixtures and an in-memory store. No Supabase project is required to explore the
-product. Writes survive until the process restarts.
+With `D12_DEMO_MODE=true` (the development default) the apps run entirely on
+seeded fixtures and an in-memory store. No Supabase project is required to
+explore the product. Writes survive until the process restarts. Production
+builds default to demo mode off unless `D12_DEMO_MODE=true` is set explicitly.
 
 ### Demo accounts
 
@@ -77,9 +78,11 @@ editor (Dashboard → SQL Editor):
 2. `packages/db/sql/002_rls.sql` — helper functions and tenant-scoped policies
 3. `packages/db/sql/003_seed.sql` — tenants, roles, demo accounts and grants
 
-Then link each demo account to a Supabase Auth user by setting
-`d12_iam_users.auth_id` (see the comment at the end of the seed file). Request
-claims are resolved through `auth.uid()`, so RLS works with normal Supabase Auth
+Then link each demo account to a Supabase Auth user. `021_link_seed_auth_users.sql`
+fills `d12_iam_users.auth_id` for emails that already exist in `auth.users`, and
+`npm run link:seed-users` reports what is still missing (add `--create --apply`
+with `D12_SEED_PASSWORD` set to create the remaining accounts). Request claims
+are resolved through `auth.uid()`, so RLS works with normal Supabase Auth
 sessions.
 
 Set `SUPABASE_SERVICE_ROLE_KEY` to let the hub provision accounts and ingest
@@ -120,6 +123,7 @@ Set `D12_TENANT_URL` to point a worker at a deployed app instead of localhost.
 ## Docs
 
 - [`docs/architecture.md`](docs/architecture.md) — topology, request flows, data model, RLS, production checklist
+- [`docs/deployment.md`](docs/deployment.md) — six-site Netlify setup, environment variables, domains and account linking
 - [`docs/api-contracts.md`](docs/api-contracts.md) — every endpoint, event schema, signing and retry rules
 
 ## Adding another subsidiary
@@ -135,7 +139,11 @@ add a row to `d12_tenants` and create the tenant workspace.
 ## Production checklist
 
 - Set a long random `D12_SESSION_SECRET` and `D12_COOKIE_DOMAIN=.district12.co.ug`.
-- Turn `D12_DEMO_MODE` off and switch `packages/auth/src/session.ts` to Supabase Auth.
+- Set `D12_DEMO_MODE=false`; production already defaults to off, and
+  `npm run check:deploy` fails a build if demo mode, the session secret,
+  Supabase keys or the site URLs are misconfigured.
+- Deploy the hub and each subsidiary as its own Netlify site (`docs/deployment.md`)
+  and link seeded accounts with `npm run link:seed-users`.
 - Give each app its own hostname; keep API routes server-only.
 - Stop using the service role from tenant apps: issue tenant-scoped Supabase
   JWTs or call the hub through a tenant gateway instead.
