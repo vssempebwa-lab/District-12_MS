@@ -20,7 +20,7 @@ export default async function EmployeesPage({
         className="[&_h1]:text-navy [&_h1]:font-bold [&_p:first-child]:text-royal"
         eyebrow="Human resources"
         title="Employees"
-        description="One directory for the group: create accounts, scope roles and move people between subsidiaries."
+        description="One directory for the group: create accounts, scope roles and move people between subsidiaries. Each new account also opens an employment profile in Team management."
         actions={
           <Badge tone={directory.mode === "supabase" ? "success" : "warning"}>
             {directory.mode === "supabase" ? "Directory live" : "Directory demo"}

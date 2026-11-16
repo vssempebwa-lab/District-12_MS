@@ -1,0 +1,104 @@
+name: Deploy test sites
+
+on:
+  workflow_dispatch:
+    inputs:
+      app:
+        description: App to deploy
+        required: true
+        default: all
+        type: choice
+        options:
+          - all
+          - hub
+          - passito
+          - mariz
+          - rub-shoots
+          - shop-for-me
+          - expresso-point
+
+jobs:
+  deploy:
+    name: ${{ matrix.app }}
+    runs-on: ubuntu-latest
+    if: inputs.app == 'all' || inputs.app == matrix.app
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - app: hub
+            site: c8482393-3446-435e-989f-978da6ea0e37
+            pkg: apps/hub
+          - app: passito
+            site: 68d72ced-f515-4480-833a-26e6cb147556
+            pkg: apps/passito
+          - app: mariz
+            site: 6d80c907-5668-4852-aea2-102285eb26de
+            pkg: apps/mariz
+          - app: rub-shoots
+            site: 811f2a30-5197-4e09-837b-4c2792f613c7
+            pkg: apps/rub-shoots
+          - app: shop-for-me
+            site: 489309cf-0665-4312-a770-16461b704dc6
+            pkg: apps/shop-for-me
+          - app: expresso-point
+            site: b788ed0f-bd85-46e3-9996-c7faec89c1c1
+            pkg: apps/expresso-point
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+          cache-dependency-path: ecosystem/package-lock.json
+
+      - name: Install workspace
+        working-directory: ecosystem
+        run: npm ci
+
+      # The Next.js runtime v4 ships classic Lambda functions plus a catch-all
+      # rewrite, which is what local CLI deploys need. v5 expects Netlify's
+      # buildbot to attach server routing metadata.
+      - name: Install Next.js runtime
+        working-directory: ecosystem
+        run: npm install --no-save @netlify/plugin-nextjs@4.41.3
+
+      - name: Load site environment
+        working-directory: ecosystem
+        env:
+          NETLIFY_AUTH_TOKEN: ${{ secrets.NETLIFY_AUTH_TOKEN }}
+          SITE_ID: ${{ matrix.site }}
+        run: |
+          npx --yes netlify-cli@latest link --id "$SITE_ID"
+          npx --yes netlify-cli@latest env:list --json </dev/null > site-env.json
+          node -e '
+            const fs = require("fs");
+            const raw = JSON.parse(fs.readFileSync("site-env.json", "utf8"));
+            const lines = [];
+            for (const [key, entry] of Object.entries(raw)) {
+              const value = entry && typeof entry === "object" ? entry.value : entry;
+              if (value === undefined || value === null || value === "") continue;
+              lines.push(`${key}=${value}`);
+            }
+            fs.writeFileSync("site-env.env", lines.join("\n") + "\n");
+            fs.unlinkSync("site-env.json");
+          '
+          cat site-env.env >> "$GITHUB_ENV"
+          rm site-env.env
+
+      - name: Use app build config at the base directory
+        working-directory: ecosystem
+        run: cp "${{ matrix.pkg }}/netlify.toml" netlify.toml
+
+      - name: Build and deploy
+        working-directory: ecosystem
+        env:
+          NETLIFY_AUTH_TOKEN: ${{ secrets.NETLIFY_AUTH_TOKEN }}
+          NETLIFY_SITE_ID: ${{ matrix.site }}
+        run: >-
+          npx --yes netlify-cli@latest deploy --build --prod
+          --site "$NETLIFY_SITE_ID"
+          --functions .netlify/functions
+          --message "GitHub Actions deploy of ${{ matrix.app }}"
