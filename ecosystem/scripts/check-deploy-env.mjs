@@ -99,9 +99,17 @@ if (anonKey && serviceKey && anonKey !== serviceKey) {
 }
 
 // Cookie domain and URLs ----------------------------------------------------
-const rawDomain = value("D12_COOKIE_DOMAIN");
+// Preview deployments on separate *.netlify.app hosts cannot share a cookie
+// domain (netlify.app is a public suffix), so host-only cookies are allowed
+// only when the operator opts in explicitly.
+const hostOnlyCookies = value("D12_HOST_ONLY_COOKIES").toLowerCase() === "true";
+const rawDomain = hostOnlyCookies ? "" : value("D12_COOKIE_DOMAIN");
 const domain = rawDomain ? normalizeDomain(rawDomain) : "";
-if (!rawDomain) {
+if (hostOnlyCookies) {
+  warnings.push(
+    "D12_HOST_ONLY_COOKIES=true: sessions are per-site; sign-in is not shared across apps",
+  );
+} else if (!rawDomain) {
   errors.push("D12_COOKIE_DOMAIN is missing (use the shared parent domain, e.g. .district12.co.ug)");
 } else if (!COOKIE_DOMAIN_PATTERN.test(domain)) {
   errors.push(`D12_COOKIE_DOMAIN "${rawDomain}" is not a valid cookie domain`);
