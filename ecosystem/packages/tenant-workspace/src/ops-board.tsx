@@ -1,11 +1,12 @@
 "use client";
 
-import { useMemo, useState, type ReactNode } from "react";
+import { useEffect, useMemo, useState, type ReactNode } from "react";
 import Link from "next/link";
 import {
   AlertTriangle,
   ArrowDownRight,
   ArrowRightLeft,
+  Banknote,
   CalendarClock,
   FileText,
   Pencil,
@@ -60,6 +61,8 @@ export interface OpsBoardProps {
   tenantId?: TenantId;
   /** Mariz leads can be turned into customer accounts in one step. */
   canConvertLeads?: boolean;
+  /** Sales records used to show how much of each customer's agreed value is already paid. */
+  paymentSales?: EntityRow[];
 }
 
 function text(value: unknown): string {
@@ -362,8 +365,40 @@ function renderField(
   );
 }
 
-function renderCell(row: EntityRow, column: ColumnConfig, config: EntityConfig, canWrite: boolean, onEdit: () => void) {
+function agreedValueFor(row: EntityRow): number {
+  const agreed = servicesTotal(parseServices(row.services));
+  return agreed > 0 ? agreed : Number(row.lifetimeValue ?? 0);
+}
+
+function renderCell(
+  row: EntityRow,
+  column: ColumnConfig,
+  config: EntityConfig,
+  canWrite: boolean,
+  onEdit: () => void,
+  paidByCustomer?: Map<string, number>,
+) {
   const value = text(row[column.key]);
+
+  if (column.kind === "paid") {
+    const agreed = agreedValueFor(row);
+    const paid = paidByCustomer?.get(row.id) ?? 0;
+    if (agreed <= 0) return <span className="text-ink-mute">—</span>;
+    const complete = paid >= agreed;
+    return (
+      <div className="whitespace-nowrap">
+        <span className={cn("font-medium", complete ? "text-emerald-700" : "text-ink")}>
+          {formatUgx(paid)}
+        </span>
+        <span className="text-xs text-ink-mute"> / {formatUgx(agreed)}</span>
+        {!complete ? (
+          <span className="block text-[11px] text-ink-mute">
+            {formatUgx(agreed - paid)} remaining
+          </span>
+        ) : null}
+      </div>
+    );
+  }
 
   if (column.kind === "stacked") {
     const body = (
@@ -499,6 +534,7 @@ export function OpsBoard({
   personalName,
   tenantId,
   canConvertLeads = false,
+  paymentSales,
 }: OpsBoardProps) {
   const config = entityConfigFor(entity, tenantId);
   const lockedKey = personalName ? ownerKey(config) : null;
@@ -515,10 +551,38 @@ export function OpsBoard({
   const [converting, setConverting] = useState<EntityRow | null>(null);
   const [convertPending, setConvertPending] = useState(false);
   const [convertError, setConvertError] = useState<string | null>(null);
+  const [paying, setPaying] = useState<EntityRow | null>(null);
+  const [payAmount, setPayAmount] = useState("");
+  const [payDate, setPayDate] = useState(() => new Date().toISOString().slice(0, 10));
+  const [payPending, setPayPending] = useState(false);
+  const [payError, setPayError] = useState<string | null>(null);
+  // Keep payments local so the "paid so far" figures update without a page reload.
+  const [salesForPayments, setSalesForPayments] = useState<EntityRow[]>(paymentSales ?? []);
   const [notice, setNotice] = useState<string | null>(null);
+
+  useEffect(() => {
+    setSalesForPayments(paymentSales ?? []);
+  }, [paymentSales]);
 
   const filterField = config.fields.find((field) => field.key === config.filterKey);
   const filterOptions = filterField?.options ?? [];
+
+  const canRecordPayments =
+    tenantId === "mariz" && entity === "customers" && canWrite && Boolean(paymentSales);
+  const paidByCustomer = useMemo(() => {
+    const map = new Map<string, number>();
+    for (const sale of salesForPayments) {
+      if (text(sale.status) !== "paid") continue;
+      const customerId = text(sale.customerId);
+      if (!customerId) continue;
+      map.set(customerId, (map.get(customerId) ?? 0) + Number(sale.amount ?? 0));
+    }
+    return map;
+  }, [salesForPayments]);
+
+  function hasBalance(row: EntityRow): boolean {
+    return agreedValueFor(row) > (paidByCustomer.get(row.id) ?? 0);
+  }
 
   const filtered = useMemo(() => {
     const query = search.trim().toLowerCase();
@@ -652,6 +716,45 @@ export function OpsBoard({
       setConvertError("Network error — the workspace could not be reached.");
     } finally {
       setConvertPending(false);
+    }
+  }
+
+  async function confirmPayment(): Promise<void> {
+    if (!paying || !(Number(payAmount) > 0)) return;
+    setPayPending(true);
+    setPayError(null);
+    try {
+      const response = await fetch(`/api/ops/customers/${paying.id}/payments`, {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ amount: Number(payAmount), paidOn: payDate }),
+      });
+      const body = (await response.json().catch(() => null)) as
+        | { ok?: boolean; sale?: EntityRow; settled?: boolean; customer?: EntityRow; error?: { message?: string } }
+        | null;
+      if (!response.ok || !body?.ok || !body.sale) {
+        setPayError(body?.error?.message ?? "Could not record the payment.");
+        return;
+      }
+      if (body.customer) {
+        setRows((previous) =>
+          sortRows(previous.map((row) => (row.id === paying.id ? body.customer! : row))),
+        );
+      }
+      if (body.sale) {
+        setSalesForPayments((previous) => [body.sale!, ...previous]);
+      }
+      setNotice(
+        `Payment of ${formatUgx(Number(body.sale.amount ?? 0))} recorded for ${text(paying.name)}` +
+          (body.settled ? " — fully paid." : "."),
+      );
+      setPaying(null);
+      setPayAmount("");
+      void syncTelemetry();
+    } catch {
+      setPayError("Network error — the workspace could not be reached.");
+    } finally {
+      setPayPending(false);
     }
   }
 
@@ -803,7 +906,7 @@ export function OpsBoard({
                       column.kind === "muted" ? "text-ink-soft" : undefined,
                     )}
                   >
-                    {renderCell(row, column, config, canWrite, () => openEdit(row))}
+                    {renderCell(row, column, config, canWrite, () => openEdit(row), paidByCustomer)}
                   </Td>
                 ))}
                 {canWrite ? (
@@ -824,6 +927,23 @@ export function OpsBoard({
                           className="flex h-7 w-7 items-center justify-center rounded-md text-ink-mute transition-colors hover:bg-emerald-50 hover:text-emerald-700"
                         >
                           <ArrowRightLeft className="h-3.5 w-3.5" />
+                        </button>
+                      ) : null}
+                      {canRecordPayments && text(row.status) !== "paid" && hasBalance(row) ? (
+                        <button
+                          type="button"
+                          onClick={() => {
+                            const agreed = agreedValueFor(row);
+                            const paid = paidByCustomer.get(row.id) ?? 0;
+                            setPayAmount(String(Math.max(agreed - paid, 0)));
+                            setPayError(null);
+                            setPaying(row);
+                          }}
+                          aria-label={`Record payment for ${config.singular.toLowerCase()}`}
+                          title="Record payment"
+                          className="flex h-7 w-7 items-center justify-center rounded-md text-ink-mute transition-colors hover:bg-emerald-50 hover:text-emerald-700"
+                        >
+                          <Banknote className="h-3.5 w-3.5" />
                         </button>
                       ) : null}
                       <button
@@ -988,6 +1108,87 @@ export function OpsBoard({
               {formatUgx(Number(converting.value ?? 0))}
             </p>
             {convertError ? <Alert tone="danger">{convertError}</Alert> : null}
+          </div>
+        ) : null}
+      </Modal>
+
+      <Modal
+        open={paying !== null}
+        title="Record payment"
+        description="Books a paid sale for this customer and streams it to the group warehouse."
+        onClose={() => {
+          if (!payPending) setPaying(null);
+        }}
+        footer={
+          <>
+            <Button
+              type="button"
+              variant="secondary"
+              onClick={() => setPaying(null)}
+              disabled={payPending}
+            >
+              Cancel
+            </Button>
+            <Button
+              type="button"
+              onClick={confirmPayment}
+              disabled={payPending || !(Number(payAmount) > 0)}
+            >
+              {payPending ? "Recording" : "Record payment"}
+            </Button>
+          </>
+        }
+      >
+        {paying ? (
+          <div className="space-y-3">
+            <p className="text-sm text-ink">
+              <span className="font-semibold">{text(paying.name)}</span>{" "}
+              <span className="text-ink-soft">· Owner {text(paying.owner) || "unassigned"}</span>
+            </p>
+            <div className="grid grid-cols-3 gap-2 rounded-lg border border-line p-3 text-center">
+              <div>
+                <p className="text-[11px] uppercase tracking-wide text-ink-mute">Agreed</p>
+                <p className="text-sm font-semibold text-ink">{formatUgx(agreedValueFor(paying))}</p>
+              </div>
+              <div>
+                <p className="text-[11px] uppercase tracking-wide text-ink-mute">Paid so far</p>
+                <p className="text-sm font-semibold text-emerald-700">
+                  {formatUgx(paidByCustomer.get(paying.id) ?? 0)}
+                </p>
+              </div>
+              <div>
+                <p className="text-[11px] uppercase tracking-wide text-ink-mute">Remaining</p>
+                <p className="text-sm font-semibold text-ink">
+                  {formatUgx(
+                    Math.max(agreedValueFor(paying) - (paidByCustomer.get(paying.id) ?? 0), 0),
+                  )}
+                </p>
+              </div>
+            </div>
+            <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+              <Field label="Amount received (UGX)">
+                <Input
+                  type="number"
+                  min={0}
+                  step="any"
+                  value={payAmount}
+                  onChange={(event) => setPayAmount(event.target.value)}
+                  placeholder="0"
+                />
+              </Field>
+              <Field label="Payment date">
+                <Input
+                  type="date"
+                  value={payDate}
+                  onChange={(event) => setPayDate(event.target.value)}
+                />
+              </Field>
+            </div>
+            <p className="text-[11px] leading-relaxed text-ink-mute">
+              Paying the full remaining balance marks the customer as paid automatically. Amounts
+              above the balance are recorded only up to the balance.
+            </p>
+            {payError ? <Alert tone="danger">{payError}</Alert> : null}
           </div>
         ) : null}
       </Modal>

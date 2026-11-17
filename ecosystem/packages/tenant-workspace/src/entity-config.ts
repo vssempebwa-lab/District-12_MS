@@ -37,7 +37,7 @@ export interface FieldConfig {
 export interface ColumnConfig {
   key: string;
   label: string;
-  kind?: "text" | "currency" | "percent" | "date" | "badge" | "muted" | "stacked" | "services";
+  kind?: "text" | "currency" | "percent" | "date" | "badge" | "muted" | "stacked" | "services" | "paid";
   align?: "left" | "right";
 }
 
@@ -405,7 +405,7 @@ const MARIZ_CUSTOMERS: EntityConfig = {
     { key: "status", label: "Status", kind: "badge" },
     { key: "issueOn", label: "Issued", kind: "date", align: "right" },
     { key: "owner", label: "Owner" },
-    { key: "lifetimeValue", label: "Value", kind: "currency", align: "right" },
+    { key: "paid", label: "Paid / agreed", kind: "paid", align: "right" },
   ],
   fields: [
     { key: "name", label: "Customer name", type: "text", required: true },

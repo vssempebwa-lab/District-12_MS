@@ -20,6 +20,10 @@ export default async function EntityPage({ params }: { params: { entity: string 
   const records = await listEntity(TENANT_ID, params.entity);
   const canWrite = hasPermission(session, `${params.entity}.write`, TENANT_ID);
   const canSync = hasPermission(session, "telemetry.write", TENANT_ID);
+  const paymentSales =
+    params.entity === "customers" && hasPermission(session, "sales.read", TENANT_ID)
+      ? ((await listEntity(TENANT_ID, "sales")) as unknown as EntityRow[])
+      : undefined;
 
   return (
     <OpsBoard
@@ -30,6 +34,7 @@ export default async function EntityPage({ params }: { params: { entity: string 
       tenantId={TENANT_ID}
       canConvertLeads={params.entity === "leads"}
       personalName={personalWorkName(session) ?? undefined}
+      paymentSales={paymentSales}
     />
   );
 }
