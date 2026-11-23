@@ -526,6 +526,7 @@ const TALENT_CLINIC_CUSTOMERS: EntityConfig = {
 
 const TALENT_CLINIC_PROJECTS: EntityConfig = {
   ...ENTITY_CONFIG.projects,
+  detailBase: "/projects",
   description: "Six-week cohorts with a start date and countdown to completion.",
   columns: [
     { key: "name", label: "Cohort", kind: "stacked" },
