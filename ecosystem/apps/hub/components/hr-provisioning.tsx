@@ -644,7 +644,7 @@ function AccountEditor({
   const [localError, setLocalError] = useState<string | null>(null);
   const [showPassword, setShowPassword] = useState(false);
   const global = isGlobalRole(draft.role);
-  const canPeek = draft.tenants.includes("mariz");
+  const canPeek = true;
 
   function toggleTenant(id: TenantId): void {
     setDraft((current) => ({

@@ -77,9 +77,9 @@ export function LoginForm({ next, demo }: { next: string; demo?: DemoDirectory |
             onClick={() => setShowPassword((value) => !value)}
             aria-label={showPassword ? "Hide password" : "Show password"}
             aria-pressed={showPassword}
-            className="absolute inset-y-0 right-2 flex items-center text-ink-mute transition-colors hover:text-ink"
+            className="absolute inset-y-0 right-2 z-10 flex items-center justify-center rounded-md px-2 text-ink-soft transition-colors hover:text-ink focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand/30"
           >
-            {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+            {showPassword ? <EyeOff className="h-5 w-5" /> : <Eye className="h-5 w-5" />}
           </button>
         </div>
       </label>
