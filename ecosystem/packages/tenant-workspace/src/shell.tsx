@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { usePathname } from "next/navigation";
+import { usePathname, useSearchParams } from "next/navigation";
 import { useEffect, useState, type ReactNode } from "react";
 import {
   ArrowUpRight,
@@ -40,6 +40,12 @@ interface NavItem {
   tenants?: TenantId[];
   hiddenFor?: TenantId[];
   labels?: Partial<Record<TenantId, string>>;
+}
+
+export interface CohortLink {
+  id: string;
+  code: string;
+  label: string;
 }
 
 const TALENT_CLINIC_HIDDEN = ["talent-clinic"] as const;
@@ -104,6 +110,7 @@ export function TenantShell({
   shiftStartedAt,
   accent,
   density = "comfortable",
+  cohortLinks,
   children,
 }: {
   tenant: TenantMeta;
@@ -113,9 +120,12 @@ export function TenantShell({
   shiftStartedAt?: string;
   accent?: string;
   density?: "compact" | "comfortable";
+  cohortLinks?: CohortLink[];
   children: ReactNode;
 }) {
   const pathname = usePathname();
+  const searchParams = useSearchParams();
+  const activeCohortId = searchParams.get("cohort") || "all";
   const [pending, setPending] = useState(false);
   const [shiftPending, setShiftPending] = useState(false);
   const [shiftNote, setShiftNote] = useState<{ tone: "ok" | "error"; text: string } | null>(null);
@@ -233,6 +243,55 @@ export function TenantShell({
               </Link>
             );
           })}
+          {cohortLinks?.length ? (
+            <div className="mt-3 border-t border-line pt-3">
+              <p className="px-3 pb-1.5 text-[10px] font-semibold uppercase tracking-wider text-ink-mute">
+                Cohort selector
+              </p>
+              <div className="space-y-0.5">
+                <Link
+                  href="/?cohort=all"
+                  className={cn(
+                    "flex items-center gap-2 rounded-lg px-3 text-xs font-medium transition-colors",
+                    pathname === "/" && activeCohortId === "all"
+                      ? "bg-emerald-50 text-emerald-800"
+                      : "text-ink-soft hover:bg-canvas hover:text-ink",
+                    compact ? "py-1.5" : "py-2",
+                  )}
+                >
+                  <span className="flex h-4 w-4 shrink-0 items-center justify-center rounded bg-slate-100 text-[9px] font-bold text-slate-600">
+                    ALL
+                  </span>
+                  All Cohorts
+                </Link>
+                {cohortLinks.map((cohort) => {
+                  const active = pathname === "/" && activeCohortId === cohort.id;
+                  return (
+                    <Link
+                      key={cohort.id}
+                      href={`/?cohort=${encodeURIComponent(cohort.id)}`}
+                      title={cohort.label}
+                      className={cn(
+                        "flex items-center gap-2 rounded-lg px-3 text-xs font-medium transition-colors",
+                        compact ? "py-1.5" : "py-2",
+                        active ? "bg-emerald-50 text-emerald-800" : "text-ink-soft hover:bg-canvas hover:text-ink",
+                      )}
+                    >
+                      <span
+                        className={cn(
+                          "flex h-4 w-4 shrink-0 items-center justify-center rounded text-[9px] font-bold",
+                          active ? "bg-emerald-600 text-white" : "bg-slate-100 text-slate-600",
+                        )}
+                      >
+                        {cohort.code.slice(-2) || "•"}
+                      </span>
+                      <span className="truncate">{cohort.label}</span>
+                    </Link>
+                  );
+                })}
+              </div>
+            </div>
+          ) : null}
         </nav>
 
         <div className="shrink-0 space-y-3 border-t border-line px-3 pb-4 pt-3">
@@ -364,6 +423,57 @@ export function TenantShell({
                   </Link>
                 );
               })}
+              {cohortLinks?.length ? (
+                <div className="col-span-full mt-2 border-t border-line pt-2">
+                  <p className="px-2.5 pb-1.5 text-[10px] font-semibold uppercase tracking-wider text-ink-mute">
+                    Cohort selector
+                  </p>
+                  <div className="grid grid-cols-2 gap-1 sm:grid-cols-3 md:grid-cols-4">
+                    <Link
+                      href="/?cohort=all"
+                      onClick={() => setMenuOpen(false)}
+                      className={cn(
+                        "flex min-w-0 items-center gap-2 rounded-lg px-2.5 text-xs font-medium",
+                        compact ? "py-1.5" : "py-2",
+                        pathname === "/" && activeCohortId === "all"
+                          ? "bg-emerald-50 text-emerald-800"
+                          : "bg-canvas text-ink-soft hover:text-ink",
+                      )}
+                    >
+                      <span className="flex h-4 w-4 shrink-0 items-center justify-center rounded bg-slate-100 text-[9px] font-bold text-slate-600">
+                        ALL
+                      </span>
+                      <span className="truncate">All Cohorts</span>
+                    </Link>
+                    {cohortLinks.map((cohort) => {
+                      const active = pathname === "/" && activeCohortId === cohort.id;
+                      return (
+                        <Link
+                          key={cohort.id}
+                          href={`/?cohort=${encodeURIComponent(cohort.id)}`}
+                          onClick={() => setMenuOpen(false)}
+                          title={cohort.label}
+                          className={cn(
+                            "flex min-w-0 items-center gap-2 rounded-lg px-2.5 text-xs font-medium",
+                            compact ? "py-1.5" : "py-2",
+                            active ? "bg-emerald-50 text-emerald-800" : "bg-canvas text-ink-soft hover:text-ink",
+                          )}
+                        >
+                          <span
+                            className={cn(
+                              "flex h-4 w-4 shrink-0 items-center justify-center rounded text-[9px] font-bold",
+                              active ? "bg-emerald-600 text-white" : "bg-slate-100 text-slate-600",
+                            )}
+                          >
+                            {cohort.code.slice(-2) || "•"}
+                          </span>
+                          <span className="truncate">{cohort.label}</span>
+                        </Link>
+                      );
+                    })}
+                  </div>
+                </div>
+              ) : null}
             </div>
           </nav>
         ) : null}

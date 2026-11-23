@@ -1,7 +1,8 @@
 "use client";
 
-import { useState, useMemo } from "react";
+import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
+import { useRouter, useSearchParams } from "next/navigation";
 import { Plus, Users, Search, Download, RotateCcw, Pencil, Trash2 } from "lucide-react";
 import { PageHeader, Card, StatCard, Button, Badge, Input, Select, Modal, Field } from "@d12/ui";
 import { formatNumber, formatUgx, shortDate } from "@d12/tenant-workspace";
@@ -71,9 +72,14 @@ export interface CohortDashboardProps {
 }
 
 export default function CohortDashboard({ initialCohorts, initialParticipants }: CohortDashboardProps) {
+  const router = useRouter();
+  const searchParams = useSearchParams();
+  const cohortParam = searchParams.get("cohort");
   const [cohorts, setCohorts] = useState<ProjectRecord[]>(initialCohorts);
   const [participants, setParticipants] = useState<CustomerRecord[]>(initialParticipants);
-  const [selected, setSelected] = useState("all");
+  const [selected, setSelected] = useState(() =>
+    cohortParam && cohortParam !== "all" ? cohortParam : "all",
+  );
   const [search, setSearch] = useState("");
   const [filterClinic, setFilterClinic] = useState("");
   const [filterPayment, setFilterPayment] = useState("");
@@ -158,6 +164,16 @@ export default function CohortDashboard({ initialCohorts, initialParticipants }:
     window.setTimeout(() => setNotice(""), 4000);
   }
 
+  useEffect(() => {
+    const next = cohortParam && cohortParam !== "all" ? cohortParam : "all";
+    setSelected((current) => (current === next ? current : next));
+  }, [cohortParam]);
+
+  function selectCohort(id: string) {
+    setSelected(id);
+    router.replace(id === "all" ? "/" : `/?cohort=${encodeURIComponent(id)}`, { scroll: false });
+  }
+
   function openCohortModal(id: string | null) {
     setEditCohortId(id);
     if (id) {
@@ -229,7 +245,7 @@ export default function CohortDashboard({ initialCohorts, initialParticipants }:
     if (res.ok) {
       setParticipants((prev) => prev.filter((p) => p.cohort !== cohort.name));
       setCohorts((prev) => prev.filter((c) => c.id !== id));
-      if (selected === id) setSelected("all");
+      if (selected === id) selectCohort("all");
       showNotice("Cohort deleted.");
     } else {
       showNotice("Could not delete cohort.");
@@ -392,8 +408,7 @@ export default function CohortDashboard({ initialCohorts, initialParticipants }:
     const res = await fetch("/api/ops/reset-demo", { method: "POST" });
     setBusy(false);
     if (res.ok) {
-      setSelected("all");
-      window.location.reload();
+      window.location.assign("/");
     } else {
       showNotice("Could not reset demo data.");
     }
@@ -428,7 +443,7 @@ export default function CohortDashboard({ initialCohorts, initialParticipants }:
 
       {/* Cohort switcher and primary actions */}
       <div className="tc-no-print flex flex-wrap items-center gap-2">
-        <Select aria-label="Cohort selector" value={selected} onChange={(e) => setSelected(e.target.value)} className="min-w-[220px]">
+        <Select aria-label="Cohort selector" value={selected} onChange={(e) => selectCohort(e.target.value)} className="min-w-[220px]">
           <option value="all">All Cohorts</option>
           {cohorts.map((c) => (
             <option key={c.id} value={c.id}>{cohortLabel(c)}</option>
@@ -506,7 +521,7 @@ export default function CohortDashboard({ initialCohorts, initialParticipants }:
               {cohorts.map((c) => {
                 const pr = progress(c);
                 return (
-                  <button key={c.id} className="rounded-lg border border-slate-100 bg-slate-50 px-3 py-2 text-left hover:border-emerald-300" onClick={() => setSelected(c.id)}>
+                  <button key={c.id} className="rounded-lg border border-slate-100 bg-slate-50 px-3 py-2 text-left hover:border-emerald-300" onClick={() => selectCohort(c.id)}>
                     <div className="flex items-center justify-between gap-2">
                       <span className="truncate text-xs font-semibold text-navy">{cohortLabel(c)}</span>
                       <span className="shrink-0 text-[10px] font-semibold text-emerald-700">{pr.label}</span>

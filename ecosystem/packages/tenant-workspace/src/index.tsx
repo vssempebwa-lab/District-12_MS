@@ -5,6 +5,6 @@ export * from "./format";
 export * from "./report-detail";
 export * from "./reports";
 export { OpsBoard, type EntityRow, type OpsBoardProps } from "./ops-board";
-export { TenantShell } from "./shell";
+export { TenantShell, type CohortLink } from "./shell";
 export { SyncButton, syncTelemetry, type SyncOutcome } from "./sync-button";
 export * from "./staff-detail";
