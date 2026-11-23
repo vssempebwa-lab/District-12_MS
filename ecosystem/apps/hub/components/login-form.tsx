@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { ArrowRight, ChevronDown, Loader2, ShieldCheck } from "lucide-react";
+import { ArrowRight, ChevronDown, Eye, EyeOff, Loader2, ShieldCheck } from "lucide-react";
 import { Alert } from "@d12/ui";
 
 const labelClass = "block text-[13px] font-medium text-ink-soft";
@@ -16,6 +16,7 @@ export interface DemoDirectory {
 export function LoginForm({ next, demo }: { next: string; demo?: DemoDirectory | null }) {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState(demo?.password ?? "");
+  const [showPassword, setShowPassword] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [pending, setPending] = useState(false);
 
@@ -62,14 +63,25 @@ export function LoginForm({ next, demo }: { next: string; demo?: DemoDirectory |
 
       <label className="block">
         <span className={labelClass}>Password</span>
-        <input
-          type="password"
-          value={password}
-          onChange={(event) => setPassword(event.target.value)}
-          autoComplete="current-password"
-          required
-          className={inputClass}
-        />
+        <div className="relative">
+          <input
+            type={showPassword ? "text" : "password"}
+            value={password}
+            onChange={(event) => setPassword(event.target.value)}
+            autoComplete="current-password"
+            required
+            className={`${inputClass} pr-11`}
+          />
+          <button
+            type="button"
+            onClick={() => setShowPassword((value) => !value)}
+            aria-label={showPassword ? "Hide password" : "Show password"}
+            aria-pressed={showPassword}
+            className="absolute inset-y-0 right-2 flex items-center text-ink-mute transition-colors hover:text-ink"
+          >
+            {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+          </button>
+        </div>
       </label>
 
       {error ? <Alert tone="danger">{error}</Alert> : null}
