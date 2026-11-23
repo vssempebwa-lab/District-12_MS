@@ -146,6 +146,11 @@ create table if not exists public.d12_ops_customers (
   last_payment_on date,
   last_payment_by text not null default '',
   last_payment_by_email text not null default '',
+  registration_number text not null default '',
+  clinic text not null default '',
+  program_session text not null default '',
+  cohort text not null default '',
+  start_date date,
   created_at timestamptz not null default now(),
   updated_at timestamptz not null default now()
 );
@@ -909,6 +914,9 @@ create table if not exists public.d12_ops_projects (
   spent numeric(16, 2) not null default 0,
   progress integer not null default 0 check (progress between 0 and 100),
   due_on date,
+  start_date date,
+  duration_weeks integer not null default 6,
+  program_session text not null default '',
   owner text,
   description text,
   created_at timestamptz not null default now(),
