@@ -10,7 +10,8 @@
   html, body { margin:0; padding:0; font-family:"Segoe UI",system-ui,-apple-system,sans-serif; background:var(--bg); color:var(--text); }
   button { font-family:inherit; cursor:pointer; border:none; } input,select,textarea { font-family:inherit; }
   .layout { display:grid; grid-template-columns:260px 1fr; min-height:100vh; }
-  @media (max-width:780px){ .layout { grid-template-columns:1fr; } .sidebar { position:static; width:100%; } }
+  @media (max-width:780px){ .layout { grid-template-columns:1fr; } .sidebar { position:fixed; left:0; top:0; width:280px; height:100vh; transform:translateX(-100%); transition:transform .25s; z-index:40; } .sidebar.open { transform:translateX(0); } .overlay { display:none; position:fixed; inset:0; background:rgba(0,0,0,.45); z-index:30; } .overlay.open { display:block; } .mobile-bar { display:flex; align-items:center; gap:10px; margin-bottom:14px; } .mobile-bar button { background:var(--navy); color:#fff; padding:8px 12px; border-radius:8px; font-weight:700; } }
+  @media (min-width:781px){ .mobile-bar { display:none; } .overlay { display:none !important; } }
   .sidebar { background:var(--sidebar); color:#fff; padding:20px 16px; display:flex; flex-direction:column; gap:14px; position:sticky; top:0; height:100vh; overflow:auto; }
   .brand { display:flex; align-items:center; gap:10px; padding-bottom:14px; border-bottom:1px solid rgba(255,255,255,.12); }
   .brand .mark { width:38px; height:38px; border-radius:10px; background:var(--emerald); display:flex; align-items:center; justify-content:center; font-weight:800; color:#fff; }
@@ -103,6 +104,8 @@
 </style>
 </head>
 <body>
+<div class="overlay" id="overlay"></div>
+<div class="mobile-bar"><button id="menuBtn">☰ Cohorts</button><span style="font-weight:700;color:var(--navy)">Mariz Talent Clinic</span></div>
 <div class="layout">
   <aside class="sidebar">
     <div class="brand">
@@ -301,7 +304,7 @@ function render(){
   const list=document.getElementById("cohortList");
   list.innerHTML=`<div class="cohort-item ${selectedCohortId==="all"?"active":""}" data-id="all"><div class="code">ALL</div><div class="nm">All Cohorts</div><div class="prog">${participants.length} participants</div></div>`+
     cohorts.map(c=>{const p=cohortProgress(c);return `<div class="cohort-item ${selectedCohortId===c.id?"active":""}" data-id="${c.id}"><div class="code">${c.code}</div><div class="nm">${c.name}</div><div class="prog">${p.label}${p.daysLeft>0?" · "+p.daysLeft+"d":""}</div></div>`;}).join("");
-  list.querySelectorAll(".cohort-item").forEach(el=>el.onclick=()=>{selectedCohortId=el.dataset.id;render();});
+  list.querySelectorAll(".cohort-item").forEach(el=>el.onclick=()=>{selectedCohortId=el.dataset.id;document.querySelector(".sidebar").classList.remove("open");document.getElementById("overlay").classList.remove("open");render();});
 
   // view title
   if(selectedCohortId==="all"||!cohorts.find(c=>c.id===selectedCohortId)){document.getElementById("viewTitle").textContent="All Cohorts Overview";document.getElementById("viewSub").textContent=`Showing participants across ${cohorts.length} cohort(s).`;}else{const c=cohortById(selectedCohortId);document.getElementById("viewTitle").textContent=c.code+" — "+c.name;document.getElementById("viewSub").textContent=`${c.programSession||"Session TBD"} · ${c.durationWeeks||6} weeks`;document.getElementById("viewTitle").textContent=c.name;}
@@ -332,6 +335,8 @@ function render(){
 
 function initFilters(){const fc=document.getElementById("filterClinic");fc.innerHTML=`<option value="">All Clinics</option>`+CLINICS.map(c=>`<option>${c}</option>`).join("");const fs=document.getElementById("filterSession");fs.innerHTML=`<option value="">All Sessions</option>`+SESSIONS.map(s=>`<option value="${s}">${s.split(" (")[0]}</option>`).join("");}
 initFilters();
+document.getElementById("menuBtn").onclick = () => { document.querySelector(".sidebar").classList.add("open"); document.getElementById("overlay").classList.add("open"); };
+document.getElementById("overlay").onclick = () => { document.querySelector(".sidebar").classList.remove("open"); document.getElementById("overlay").classList.remove("open"); };
 seedDemo();
 render();
 </script>
