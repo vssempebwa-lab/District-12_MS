@@ -101,6 +101,16 @@
   .toast { position:fixed; bottom:20px; right:20px; background:var(--navy); color:#fff; padding:12px 18px; border-radius:10px; font-size:13px; box-shadow:0 8px 24px rgba(0,0,0,.2); display:none; z-index:60; }
   .toast.show { display:block; }
   .footer { text-align:center; padding:18px 0 4px; color:var(--muted); font-size:12px; }
+  @media print {
+    .sidebar, .mobile-bar, .top-actions, .toolbar, .modal-backdrop, .toast { display:none !important; }
+    .layout { grid-template-columns:1fr; }
+    .main { padding:0; }
+    body { background:#fff; }
+    .table-wrap { box-shadow:none; border:1px solid #ccc; }
+    table { min-width:0; font-size:11px; }
+    th, td { padding:6px 8px; }
+    .banner { page-break-inside:avoid; }
+  }
 </style>
 </head>
 <body>
@@ -128,8 +138,7 @@
       </div>
       <div class="top-actions">
         <button class="btn btn-primary" id="registerBtn">+ Register Participant</button>
-        <button class="btn btn-ghost" id="exportCsv">Export CSV</button>
-        <button class="btn btn-ghost" id="exportJson">Export JSON</button>
+        <button class="btn btn-ghost" id="exportPdf">Export PDF</button>
         <button class="btn btn-danger" id="resetBtn">Reset Demo</button>
       </div>
     </div>
@@ -292,9 +301,9 @@ document.getElementById("search").oninput=render;
 document.getElementById("filterClinic").onchange=render;
 document.getElementById("filterPayment").onchange=render;
 document.getElementById("filterSession").onchange=render;
-document.getElementById("exportCsv").onclick=()=>{const rows=filteredParticipants();const header=["Reg. No","Name","Contact","Address","Clinic","Session","Start Date","Payment Status","Balance (UGX)"];const csv=[header.join(",")].concat(rows.map(p=>[p.regNo,`"${p.name}"`,p.contact,`"${p.address}"`,p.clinic,`"${p.session}"`,p.startDate,p.paymentStatus,p.balance].join(","))).join("\n");download("cohort_roster.csv",csv,"text/csv");};
-document.getElementById("exportJson").onclick=()=>{download("cohort_roster.json",JSON.stringify(filteredParticipants(),null,2),"application/json");};
-function download(name,content,type){const blob=new Blob([content],{type});const url=URL.createObjectURL(blob);const a=document.createElement("a");a.href=url;a.download=name;a.click();URL.revokeObjectURL(url);}
+document.getElementById("exportPdf").onclick=()=>{const prevTitle=document.title;const cohort=selectedCohortId==="all"?"All Cohorts":(cohortById(selectedCohortId)?.name||"Cohort");document.title="Mariz Talent Clinic - "+cohort+" Roster";window.print();document.title=prevTitle;};
+
+
 document.getElementById("resetBtn").onclick=()=>{if(!confirm("Reset all data to demo sample?"))return;localStorage.removeItem("mtc_cohorts");localStorage.removeItem("mtc_participants");cohorts=[];participants=[];seedDemo();render();toast("Demo data reset.");};
 
 function filteredParticipants(){const q=document.getElementById("search").value.trim().toLowerCase();const fc=document.getElementById("filterClinic").value;const fp=document.getElementById("filterPayment").value;const fs=document.getElementById("filterSession").value;return participants.filter(p=>{if(selectedCohortId!=="all"&&p.cohortId!==selectedCohortId)return false;if(fc&&p.clinic!==fc)return false;if(fp&&p.paymentStatus!==fp)return false;if(fs&&p.session!==fs)return false;if(q){const hay=(p.regNo+" "+p.name+" "+p.contact+" "+p.address).toLowerCase();if(!hay.includes(q))return false;}return true;});}
