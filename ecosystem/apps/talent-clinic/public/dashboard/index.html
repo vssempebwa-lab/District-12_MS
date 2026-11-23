@@ -1,0 +1,353 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Mariz Talent Clinic — Admin & Cohort Tracker</title>
+<style>
+  :root { --navy:#0f1f3d; --navy-2:#1a2f5a; --emerald:#10b981; --emerald-2:#059669; --slate:#64748b; --slate-2:#94a3b8; --bg:#f1f5f9; --card:#ffffff; --border:#e2e8f0; --text:#0f172a; --muted:#64748b; --danger:#ef4444; --amber:#f59e0b; --sidebar:#0f1f3d; }
+  * { box-sizing: border-box; }
+  html, body { margin:0; padding:0; font-family:"Segoe UI",system-ui,-apple-system,sans-serif; background:var(--bg); color:var(--text); }
+  button { font-family:inherit; cursor:pointer; border:none; } input,select,textarea { font-family:inherit; }
+  .layout { display:grid; grid-template-columns:260px 1fr; min-height:100vh; }
+  @media (max-width:780px){ .layout { grid-template-columns:1fr; } .sidebar { position:fixed; left:0; top:0; width:280px; height:100vh; transform:translateX(-100%); transition:transform .25s; z-index:40; } .sidebar.open { transform:translateX(0); } .overlay { display:none; position:fixed; inset:0; background:rgba(0,0,0,.45); z-index:30; } .overlay.open { display:block; } .mobile-bar { display:flex; align-items:center; gap:10px; margin-bottom:14px; } .mobile-bar button { background:var(--navy); color:#fff; padding:8px 12px; border-radius:8px; font-weight:700; } }
+  @media (min-width:781px){ .mobile-bar { display:none; } .overlay { display:none !important; } }
+  .sidebar { background:var(--sidebar); color:#fff; padding:20px 16px; display:flex; flex-direction:column; gap:14px; position:sticky; top:0; height:100vh; overflow:auto; }
+  .brand { display:flex; align-items:center; gap:10px; padding-bottom:14px; border-bottom:1px solid rgba(255,255,255,.12); }
+  .brand .mark { width:38px; height:38px; border-radius:10px; background:var(--emerald); display:flex; align-items:center; justify-content:center; font-weight:800; color:#fff; }
+  .brand h1 { margin:0; font-size:15px; font-weight:700; }
+  .brand p { margin:2px 0 0; font-size:11px; color:#cbd5e1; }
+  .side-title { font-size:11px; text-transform:uppercase; letter-spacing:.6px; color:#94a3b8; font-weight:700; margin:6px 4px 4px; }
+  .cohort-list { display:flex; flex-direction:column; gap:6px; }
+  .cohort-item { padding:10px 12px; border-radius:10px; cursor:pointer; border:1px solid transparent; transition:all .15s; }
+  .cohort-item:hover { background:rgba(255,255,255,.08); }
+  .cohort-item.active { background:rgba(16,185,129,.18); border-color:rgba(16,185,129,.4); }
+  .cohort-item .code { font-size:11px; color:#94a3b8; font-weight:700; }
+  .cohort-item .nm { font-size:13px; font-weight:600; color:#fff; margin-top:2px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+  .cohort-item .prog { font-size:10px; color:#cbd5e1; margin-top:4px; }
+  .side-btn { width:100%; padding:10px 12px; border-radius:10px; background:var(--emerald); color:#fff; font-weight:700; font-size:13px; text-align:left; }
+  .side-btn:hover { background:var(--emerald-2); }
+  .side-foot { margin-top:auto; font-size:11px; color:#94a3b8; padding-top:10px; border-top:1px solid rgba(255,255,255,.12); }
+
+  .main { padding:24px; max-width:1200px; }
+  .topbar { display:flex; flex-wrap:wrap; align-items:center; justify-content:space-between; gap:12px; margin-bottom:18px; }
+  .topbar h2 { margin:0; font-size:22px; color:var(--navy); font-weight:700; }
+  .topbar p { margin:4px 0 0; font-size:13px; color:var(--muted); }
+  .top-actions { display:flex; gap:10px; flex-wrap:wrap; }
+  .btn { padding:10px 16px; border-radius:10px; font-size:14px; font-weight:600; display:inline-flex; align-items:center; gap:6px; transition:all .15s; border:none; cursor:pointer; }
+  .btn-primary { background:var(--emerald); color:#fff; } .btn-primary:hover { background:var(--emerald-2); }
+  .btn-ghost { background:#fff; color:var(--navy); border:1px solid var(--border); } .btn-ghost:hover { background:var(--bg); }
+  .btn-danger { background:#fee2e2; color:var(--danger); } .btn-danger:hover { background:#fecaca; }
+  .btn-sm { padding:6px 10px; font-size:12px; border-radius:8px; }
+
+  .banner { background:var(--card); border:1px solid var(--border); border-radius:14px; padding:18px 22px; margin-bottom:18px; box-shadow:0 2px 8px rgba(0,0,0,.04); }
+  .banner h3 { margin:0 0 6px; font-size:16px; color:var(--navy); }
+  .banner .meta { display:flex; flex-wrap:wrap; gap:18px; font-size:13px; color:var(--muted); margin-bottom:12px; }
+  .banner .meta b { color:var(--text); }
+  .progress { height:10px; background:#e2e8f0; border-radius:999px; overflow:hidden; }
+  .progress > div { height:100%; background:linear-gradient(90deg,var(--emerald),var(--emerald-2)); border-radius:999px; transition:width .3s; }
+  .weeks { display:grid; grid-template-columns:repeat(6,1fr); gap:6px; margin-top:10px; }
+  .week { text-align:center; padding:6px 4px; border-radius:8px; font-size:11px; font-weight:600; background:#f1f5f9; color:var(--muted); }
+  .week.done { background:#d1fae5; color:var(--emerald-2); } .week.current { background:var(--emerald); color:#fff; }
+  .status-badge { display:inline-block; padding:3px 10px; border-radius:999px; font-size:11px; font-weight:700; }
+  .status-active { background:#d1fae5; color:#065f46; } .status-upcoming { background:#dbeafe; color:#1e40af; } .status-completed { background:#e2e8f0; color:#475569; }
+
+  .kpis { display:grid; grid-template-columns:repeat(auto-fit,minmax(180px,1fr)); gap:14px; margin-bottom:18px; }
+  .kpi { background:var(--card); border:1px solid var(--border); border-radius:14px; padding:16px 18px; box-shadow:0 2px 6px rgba(0,0,0,.04); }
+  .kpi .label { font-size:12px; color:var(--muted); font-weight:600; text-transform:uppercase; letter-spacing:.5px; }
+  .kpi .value { font-size:26px; font-weight:700; color:var(--navy); margin-top:6px; }
+  .kpi .hint { font-size:12px; color:var(--slate-2); margin-top:4px; }
+
+  .grid2 { display:grid; grid-template-columns:1fr 1fr; gap:14px; margin-bottom:18px; }
+  @media (max-width:860px){ .grid2 { grid-template-columns:1fr; } }
+  .card { background:var(--card); border:1px solid var(--border); border-radius:14px; padding:18px; box-shadow:0 2px 6px rgba(0,0,0,.04); }
+  .card h3 { margin:0 0 12px; font-size:15px; color:var(--navy); }
+  .barrow { display:flex; align-items:center; gap:10px; margin-bottom:8px; }
+  .barrow .name { width:150px; font-size:12px; color:var(--text); } .barrow .track { flex:1; height:8px; background:#e2e8f0; border-radius:999px; overflow:hidden; }
+  .barrow .fill { height:100%; background:var(--emerald); border-radius:999px; } .barrow .count { width:40px; text-align:right; font-size:12px; font-weight:600; color:var(--navy); }
+
+  .toolbar { display:flex; flex-wrap:wrap; gap:10px; margin:18px 0 12px; align-items:center; }
+  .search { flex:1; min-width:220px; padding:10px 14px; border:1px solid var(--border); border-radius:10px; font-size:14px; }
+  .filter { padding:10px 12px; border:1px solid var(--border); border-radius:10px; font-size:13px; background:#fff; }
+
+  .table-wrap { background:var(--card); border:1px solid var(--border); border-radius:14px; overflow:auto; box-shadow:0 2px 6px rgba(0,0,0,.04); }
+  table { width:100%; border-collapse:collapse; font-size:13px; min-width:900px; }
+  thead { background:#f8fafc; }
+  th { text-align:left; padding:12px 14px; font-size:11px; text-transform:uppercase; letter-spacing:.5px; color:var(--muted); font-weight:700; border-bottom:1px solid var(--border); }
+  td { padding:12px 14px; border-bottom:1px solid var(--border); vertical-align:middle; }
+  tr:last-child td { border-bottom:none; } tr:hover td { background:#f8fafc; }
+  .regno { font-weight:700; color:var(--navy); font-size:12px; }
+  .namecell .nm { font-weight:600; color:var(--text); } .namecell .ct { font-size:11px; color:var(--muted); }
+  .badge { display:inline-block; padding:3px 9px; border-radius:999px; font-size:11px; font-weight:700; }
+  .b-free { background:#d1fae5; color:#065f46; } .b-paid { background:#dbeafe; color:#1e40af; } .b-partial { background:#fef3c7; color:#92400e; } .b-pending { background:#fee2e2; color:#991b1b; }
+  .bal { font-weight:700; } .bal.zero { color:var(--emerald-2); }
+  .actions { display:flex; gap:6px; flex-wrap:wrap; }
+  .empty { padding:30px; text-align:center; color:var(--muted); font-size:13px; }
+
+  .modal-backdrop { position:fixed; inset:0; background:rgba(15,23,42,.55); display:none; align-items:center; justify-content:center; z-index:50; padding:20px; }
+  .modal-backdrop.open { display:flex; }
+  .modal { background:#fff; border-radius:16px; width:100%; max-width:620px; max-height:90vh; overflow:auto; box-shadow:0 20px 60px rgba(0,0,0,.25); }
+  .modal-head { padding:18px 22px; border-bottom:1px solid var(--border); display:flex; justify-content:space-between; align-items:center; }
+  .modal-head h2 { margin:0; font-size:17px; color:var(--navy); }
+  .modal-body { padding:20px 22px; } .modal-foot { padding:14px 22px; border-top:1px solid var(--border); display:flex; justify-content:flex-end; gap:10px; }
+  .close { background:none; font-size:22px; color:var(--muted); }
+  .form-grid { display:grid; grid-template-columns:1fr 1fr; gap:14px; }
+  @media (max-width:560px){ .form-grid { grid-template-columns:1fr; } }
+  .field { display:flex; flex-direction:column; gap:5px; }
+  .field label { font-size:12px; font-weight:600; color:var(--muted); text-transform:uppercase; letter-spacing:.4px; }
+  .field input, .field select { padding:10px 12px; border:1px solid var(--border); border-radius:10px; font-size:14px; }
+  .field input:focus, .field select:focus { outline:none; border-color:var(--emerald); box-shadow:0 0 0 3px rgba(16,185,129,.15); }
+  .field.full { grid-column:1 / -1; }
+  .toast { position:fixed; bottom:20px; right:20px; background:var(--navy); color:#fff; padding:12px 18px; border-radius:10px; font-size:13px; box-shadow:0 8px 24px rgba(0,0,0,.2); display:none; z-index:60; }
+  .toast.show { display:block; }
+  .footer { text-align:center; padding:18px 0 4px; color:var(--muted); font-size:12px; }
+  @media print {
+    .sidebar, .mobile-bar, .top-actions, .toolbar, .modal-backdrop, .toast { display:none !important; }
+    .layout { grid-template-columns:1fr; }
+    .main { padding:0; }
+    body { background:#fff; }
+    .table-wrap { box-shadow:none; border:1px solid #ccc; }
+    table { min-width:0; font-size:11px; }
+    th, td { padding:6px 8px; }
+    .banner { page-break-inside:avoid; }
+  }
+</style>
+</head>
+<body>
+<div class="overlay" id="overlay"></div>
+<div class="mobile-bar"><button id="menuBtn">☰ Cohorts</button><span style="font-weight:700;color:var(--navy)">Mariz Talent Clinic</span></div>
+<div class="layout">
+  <aside class="sidebar">
+    <div class="brand">
+      <div class="mark">TC</div>
+      <div><h1>Mariz Talent Clinic</h1><p>Admin & Cohort Tracker</p></div>
+    </div>
+    <div>
+      <div class="side-title">Cohorts</div>
+      <div class="cohort-list" id="cohortList"></div>
+    </div>
+    <button class="side-btn" id="newCohortBtn">+ New Cohort</button>
+    <div class="side-foot">Data stored locally in your browser.</div>
+  </aside>
+
+  <main class="main">
+    <div class="topbar">
+      <div>
+        <h2 id="viewTitle">All Cohorts Overview</h2>
+        <p id="viewSub">Showing participants across all cohorts.</p>
+      </div>
+      <div class="top-actions">
+        <button class="btn btn-primary" id="registerBtn">+ Register Participant</button>
+        <button class="btn btn-ghost" id="exportPdf">Export PDF</button>
+        <button class="btn btn-danger" id="resetBtn">Reset Demo</button>
+      </div>
+    </div>
+
+    <section class="banner" id="cohortBanner"></section>
+
+    <div class="kpis" id="kpis"></div>
+
+    <div class="grid2">
+      <div class="card"><h3>Clinic Track Distribution</h3><div id="clinicBars"></div></div>
+      <div class="card"><h3>Programme Session Distribution</h3><div id="sessionBars"></div></div>
+    </div>
+
+    <div class="toolbar">
+      <input id="search" class="search" type="text" placeholder="Search by name, reg. no., contact, or address..." />
+      <select id="filterClinic" class="filter"><option value="">All Clinics</option></select>
+      <select id="filterPayment" class="filter">
+        <option value="">All Payment Statuses</option>
+        <option>Free / Waived</option><option>Paid in Full</option><option>Partial Payment</option><option>Pending</option>
+      </select>
+      <select id="filterSession" class="filter"><option value="">All Sessions</option></select>
+    </div>
+
+    <div class="table-wrap">
+      <table>
+        <thead><tr>
+          <th>Reg. No</th><th>Participant & Contact</th><th>Address</th><th>Clinic</th><th>Session</th><th>Start Date</th><th>Payment Status</th><th>Balance (UGX)</th><th>Actions</th>
+        </tr></thead>
+        <tbody id="tbody"></tbody>
+      </table>
+      <div class="empty" id="empty" style="display:none">No participants match your filters.</div>
+    </div>
+    <div class="footer">Mariz Talent Clinic · Admin & Cohort Tracker · Data stored locally in your browser.</div>
+  </main>
+</div>
+
+<!-- modals same as before -->
+<div class="modal-backdrop" id="cohortModal">
+  <div class="modal">
+    <div class="modal-head"><h2 id="cohortModalTitle">New Cohort</h2><button class="close" data-close="cohortModal">&times;</button></div>
+    <div class="modal-body">
+      <div class="form-grid">
+        <div class="field"><label>Cohort Code</label><input id="c_code" placeholder="COH-01" /></div>
+        <div class="field"><label>Cohort Name</label><input id="c_name" placeholder="Cohort 01 - Nov/Dec 2026 Intake" /></div>
+        <div class="field"><label>Start Date</label><input id="c_start" type="date" /></div>
+        <div class="field"><label>Registration Fee (UGX)</label><input id="c_fee" type="number" value="0" min="0" /></div>
+        <div class="field full"><label>Status</label>
+          <select id="c_status"><option>Upcoming</option><option>Active</option><option>Completed</option></select>
+        </div>
+      </div>
+    </div>
+    <div class="modal-foot">
+      <button class="btn btn-ghost" data-close="cohortModal">Cancel</button>
+      <button class="btn btn-primary" id="saveCohort">Save Cohort</button>
+    </div>
+  </div>
+</div>
+
+<div class="modal-backdrop" id="partModal">
+  <div class="modal">
+    <div class="modal-head"><h2 id="partModalTitle">Register Participant</h2><button class="close" data-close="partModal">&times;</button></div>
+    <div class="modal-body">
+      <div class="form-grid">
+        <div class="field"><label>Cohort</label><select id="p_cohort"></select></div>
+        <div class="field"><label>Registration Number</label><input id="p_regno" placeholder="Auto-generated" /></div>
+        <div class="field full"><label>Full Name</label><input id="p_name" placeholder="e.g. Aisha Kamya" /></div>
+        <div class="field"><label>Address</label><input id="p_address" placeholder="Zzana, Katwe, Makindye..." /></div>
+        <div class="field"><label>Clinic (Track)</label>
+          <select id="p_clinic">
+            <option>Computer Skills</option><option>Front Office Operations</option><option>Graphic Design</option>
+            <option>Photography</option><option>Telesales</option><option>Affiliate Marketing</option>
+          </select>
+        </div>
+        <div class="field"><label>Contact</label><input id="p_contact" placeholder="+256 7XX XXX XXX" /></div>
+        <div class="field"><label>Start Date</label><input id="p_start" type="date" /></div>
+        <div class="field"><label>Programme Session</label>
+          <select id="p_session">
+            <option>Morning Session (8:30 AM - 11:30 AM)</option>
+            <option>Afternoon Session (2:00 PM - 5:00 PM)</option>
+            <option>Weekend Intensive</option>
+          </select>
+        </div>
+        <div class="field"><label>Payment Status</label>
+          <select id="p_status">
+            <option>Free / Waived</option><option>Paid in Full</option><option>Partial Payment</option><option>Pending</option>
+          </select>
+        </div>
+        <div class="field" id="amountField" style="display:none"><label>Amount Paid (UGX)</label><input id="p_amount" type="number" value="0" min="0" /></div>
+      </div>
+    </div>
+    <div class="modal-foot">
+      <button class="btn btn-ghost" data-close="partModal">Cancel</button>
+      <button class="btn btn-primary" id="savePart">Save Participant</button>
+    </div>
+  </div>
+</div>
+
+<div class="modal-backdrop" id="payModal">
+  <div class="modal">
+    <div class="modal-head"><h2>Record Payment</h2><button class="close" data-close="payModal">&times;</button></div>
+    <div class="modal-body">
+      <p id="payInfo" style="margin:0 0 12px;font-size:13px;color:var(--muted)"></p>
+      <div class="form-grid">
+        <div class="field"><label>Amount (UGX)</label><input id="pay_amount" type="number" min="0" /></div>
+      </div>
+    </div>
+    <div class="modal-foot">
+      <button class="btn btn-ghost" data-close="payModal">Cancel</button>
+      <button class="btn btn-primary" id="savePay">Record</button>
+    </div>
+  </div>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script>
+const CLINICS = ["Computer Skills","Front Office Operations","Graphic Design","Photography","Telesales","Affiliate Marketing"];
+const SESSIONS = ["Morning Session (8:30 AM - 11:30 AM)","Afternoon Session (2:00 PM - 5:00 PM)","Weekend Intensive"];
+function load(key, fallback) { try { const v = localStorage.getItem(key); return v ? JSON.parse(v) : fallback; } catch { return fallback; } }
+function save(key, val) { localStorage.setItem(key, JSON.stringify(val)); }
+let cohorts = load("mtc_cohorts", []);
+let participants = load("mtc_participants", []);
+let editCohortId = null; let editPartId = null; let payPartId = null; let selectedCohortId = "all";
+function uid() { return "id_" + Math.random().toString(36).slice(2,10); }
+function fmtDate(d) { if (!d) return "—"; const dt = new Date(d); return dt.toLocaleDateString("en-GB", { day:"2-digit", month:"short", year:"numeric" }); }
+function addDays(dateStr, days) { const d = new Date(dateStr); d.setDate(d.getDate()+days); return d.toISOString().slice(0,10); }
+function today() { return new Date().toISOString().slice(0,10); }
+function cohortProgress(c) { const start=new Date(c.startDate); const end=new Date(c.endDate); const now=new Date(); now.setHours(0,0,0,0); if(now<start) return {label:"Upcoming",week:0,daysLeft:Math.ceil((start-now)/86400000),pct:0}; if(now>end) return {label:"Completed",week:6,daysLeft:0,pct:100}; const elapsed=Math.floor((now-start)/86400000); const week=Math.min(6,Math.floor(elapsed/7)+1); const daysLeft=Math.ceil((end-now)/86400000); const pct=Math.min(100,Math.round((elapsed/42)*100)); return {label:`Week ${week} of 6`,week,daysLeft,pct}; }
+function statusOf(c){const p=cohortProgress(c); if(p.label==="Upcoming")return"Upcoming"; if(p.label==="Completed")return"Completed"; return"Active";}
+function calcBalance(p,cohort){const fee=Number(cohort?.fee??0); if(p.paymentStatus==="Free / Waived"||p.paymentStatus==="Paid in Full")return 0; if(p.paymentStatus==="Pending")return fee; if(p.paymentStatus==="Partial Payment")return Math.max(0,fee-Number(p.amountPaid??0)); return 0;}
+function seedDemo(){ if(cohorts.length||participants.length) return; const c1={id:uid(),code:"COH-01",name:"Cohort 01 - Nov/Dec 2026 Intake",startDate:"2026-11-02",endDate:addDays("2026-11-02",42),fee:20000,status:"Active"}; const c2={id:uid(),code:"COH-02",name:"Cohort 02 - Jan 2027 Intake",startDate:"2027-01-04",endDate:addDays("2027-01-04",42),fee:0,status:"Upcoming"}; cohorts=[c1,c2]; const mk=(cohort,data)=>({id:uid(),cohortId:cohort.id,regNo:data.regNo,name:data.name,address:data.address,clinic:data.clinic,paymentStatus:data.paymentStatus,contact:data.contact,startDate:data.startDate,session:data.session,amountPaid:data.amountPaid||0}); participants=[ mk(c1,{regNo:"MTC-COH-01-001",name:"Aisha Kamya",address:"Zzana, Kampala",clinic:"Computer Skills",paymentStatus:"Paid in Full",contact:"+256 772 123 456",startDate:"2026-11-02",session:"Morning Session (8:30 AM - 11:30 AM)",amountPaid:20000}), mk(c1,{regNo:"MTC-COH-01-002",name:"Daniel Mugisha",address:"Katwe, Kampala",clinic:"Graphic Design",paymentStatus:"Partial Payment",contact:"+256 752 234 567",startDate:"2026-11-02",session:"Afternoon Session (2:00 PM - 5:00 PM)",amountPaid:10000}), mk(c1,{regNo:"MTC-COH-01-003",name:"Sandra Nansubuga",address:"Makindye, Kampala",clinic:"Telesales",paymentStatus:"Pending",contact:"+256 702 345 678",startDate:"2026-11-02",session:"Morning Session (8:30 AM - 11:30 AM)",amountPaid:0}), mk(c1,{regNo:"MTC-COH-01-004",name:"Tom Kirabo",address:"Bwaise, Kampala",clinic:"Photography",paymentStatus:"Free / Waived",contact:"+256 782 456 789",startDate:"2026-11-09",session:"Weekend Intensive",amountPaid:0}), mk(c1,{regNo:"MTC-COH-01-005",name:"Racheal Atuhaire",address:"Nansana, Wakiso",clinic:"Front Office Operations",paymentStatus:"Paid in Full",contact:"+256 762 567 890",startDate:"2026-11-02",session:"Afternoon Session (2:00 PM - 5:00 PM)",amountPaid:20000}), mk(c2,{regNo:"MTC-COH-02-001",name:"Isaac Owori",address:"Kololo, Kampala",clinic:"Affiliate Marketing",paymentStatus:"Pending",contact:"+256 712 678 901",startDate:"2027-01-04",session:"Morning Session (8:30 AM - 11:30 AM)",amountPaid:0}), mk(c2,{regNo:"MTC-COH-02-002",name:"Joan Nakabuye",address:"Ntinda, Kampala",clinic:"Computer Skills",paymentStatus:"Free / Waived",contact:"+256 792 789 012",startDate:"2027-01-04",session:"Weekend Intensive",amountPaid:0}), mk(c2,{regNo:"MTC-COH-02-003",name:"Emmanuel Mwesigwa",address:"Mukono",clinic:"Graphic Design",paymentStatus:"Partial Payment",contact:"+256 772 890 123",startDate:"2027-01-11",session:"Afternoon Session (2:00 PM - 5:00 PM)",amountPaid:5000}) ]; participants.forEach(p=>{const c=cohorts.find(x=>x.id===p.cohortId); p.balance=calcBalance(p,c);}); save("mtc_cohorts",cohorts); save("mtc_participants",participants); }
+function toast(msg){const t=document.getElementById("toast");t.textContent=msg;t.classList.add("show");setTimeout(()=>t.classList.remove("show"),2400);}
+function cohortById(id){return cohorts.find(c=>c.id===id);}
+function nextRegNo(cohort){const existing=participants.filter(p=>p.cohortId===cohort.id).length; return `MTC-${cohort.code}-${String(existing+1).padStart(3,"0")}`;}
+function openModal(id){document.getElementById(id).classList.add("open");}
+function closeModal(id){document.getElementById(id).classList.remove("open");}
+document.querySelectorAll("[data-close]").forEach(b=>b.onclick=()=>closeModal(b.dataset.close));
+document.querySelectorAll(".modal-backdrop").forEach(bd=>bd.addEventListener("click",e=>{if(e.target===bd)bd.classList.remove("open");}));
+
+
+document.getElementById("newCohortBtn").onclick=()=>{editCohortId=null;document.getElementById("cohortModalTitle").textContent="New Cohort";["c_code","c_name"].forEach(k=>document.getElementById(k).value="");document.getElementById("c_start").value=today();document.getElementById("c_fee").value=0;document.getElementById("c_status").value="Upcoming";openModal("cohortModal");};
+
+document.getElementById("saveCohort").onclick=()=>{const code=document.getElementById("c_code").value.trim();const name=document.getElementById("c_name").value.trim();const start=document.getElementById("c_start").value;const fee=Number(document.getElementById("c_fee").value)||0;const status=document.getElementById("c_status").value;if(!code||!name||!start){toast("Please fill code, name and start date.");return;}if(editCohortId){const c=cohortById(editCohortId);c.code=code;c.name=name;c.startDate=start;c.endDate=addDays(start,42);c.fee=fee;c.status=status;}else{cohorts.push({id:uid(),code,name,startDate:start,endDate:addDays(start,42),fee,status});}save("mtc_cohorts",cohorts);closeModal("cohortModal");toast("Cohort saved.");render();};
+function editCohort(id){const c=cohortById(id);editCohortId=id;document.getElementById("cohortModalTitle").textContent="Edit Cohort";document.getElementById("c_code").value=c.code;document.getElementById("c_name").value=c.name;document.getElementById("c_start").value=c.startDate;document.getElementById("c_fee").value=c.fee;document.getElementById("c_status").value=c.status;openModal("cohortModal");}
+function deleteCohort(id){if(!confirm("Delete this cohort and all its participants?"))return;participants=participants.filter(p=>p.cohortId!==id);cohorts=cohorts.filter(c=>c.id!==id);if(selectedCohortId===id)selectedCohortId="all";save("mtc_cohorts",cohorts);save("mtc_participants",participants);toast("Cohort deleted.");render();}
+
+document.getElementById("registerBtn").onclick=()=>openPartModal(null);
+
+function openPartModal(id){editPartId=id;document.getElementById("partModalTitle").textContent=id?"Edit Participant":"Register Participant";const cohortSel=document.getElementById("p_cohort");cohortSel.innerHTML=cohorts.map(c=>`<option value="${c.id}">${c.code} — ${c.name}</option>`).join("");if(selectedCohortId&&selectedCohortId!=="all"&&cohorts.find(c=>c.id===selectedCohortId))cohortSel.value=selectedCohortId;if(id){const p=participants.find(x=>x.id===id);cohortSel.value=p.cohortId;document.getElementById("p_regno").value=p.regNo;document.getElementById("p_name").value=p.name;document.getElementById("p_address").value=p.address;document.getElementById("p_clinic").value=p.clinic;document.getElementById("p_contact").value=p.contact;document.getElementById("p_start").value=p.startDate;document.getElementById("p_session").value=p.session;document.getElementById("p_status").value=p.paymentStatus;document.getElementById("p_amount").value=p.amountPaid||0;}else{document.getElementById("p_regno").value="";document.getElementById("p_name").value="";document.getElementById("p_address").value="";document.getElementById("p_contact").value="";const c=cohortById(cohortSel.value);document.getElementById("p_start").value=c?c.startDate:today();document.getElementById("p_status").value="Pending";document.getElementById("p_amount").value=0;}toggleAmountField();openModal("partModal");}
+document.getElementById("p_status").onchange=toggleAmountField;
+function toggleAmountField(){const st=document.getElementById("p_status").value;document.getElementById("amountField").style.display=(st==="Partial Payment")?"block":"none";}
+document.getElementById("savePart").onclick=()=>{const cohortId=document.getElementById("p_cohort").value;const cohort=cohortById(cohortId);if(!cohort){toast("Select a cohort.");return;}let regNo=document.getElementById("p_regno").value.trim();const name=document.getElementById("p_name").value.trim();if(!name){toast("Full name is required.");return;}if(!regNo)regNo=nextRegNo(cohort);const address=document.getElementById("p_address").value.trim();const clinic=document.getElementById("p_clinic").value;const contact=document.getElementById("p_contact").value.trim();const startDate=document.getElementById("p_start").value||cohort.startDate;const session=document.getElementById("p_session").value;const paymentStatus=document.getElementById("p_status").value;const amountPaid=Number(document.getElementById("p_amount").value)||0;const obj={cohortId,regNo,name,address,clinic,contact,startDate,session,paymentStatus,amountPaid};if(editPartId){const p=participants.find(x=>x.id===editPartId);Object.assign(p,obj);p.balance=calcBalance(p,cohort);}else{const p={id:uid(),...obj,balance:0};p.balance=calcBalance(p,cohort);participants.push(p);}save("mtc_participants",participants);closeModal("partModal");toast("Participant saved.");render();};
+
+
+function openPay(id){payPartId=id;const p=participants.find(x=>x.id===id);const c=cohortById(p.cohortId);document.getElementById("payInfo").textContent=`${p.name} · ${p.regNo} · Balance: ${p.balance.toLocaleString()} UGX (Fee ${(c?.fee||0).toLocaleString()} UGX)`;document.getElementById("pay_amount").value=p.balance;openModal("payModal");}
+document.getElementById("savePay").onclick=()=>{const p=participants.find(x=>x.id===payPartId);const c=cohortById(p.cohortId);const amt=Number(document.getElementById("pay_amount").value)||0;if(amt<=0){toast("Enter an amount.");return;}p.amountPaid=(p.amountPaid||0)+amt;const fee=c?.fee||0;if(p.amountPaid>=fee){p.paymentStatus="Paid in Full";p.amountPaid=fee;}else{p.paymentStatus="Partial Payment";}p.balance=calcBalance(p,c);save("mtc_participants",participants);closeModal("payModal");toast("Payment recorded.");render();};
+function deletePart(id){if(!confirm("Delete this participant?"))return;participants=participants.filter(p=>p.id!==id);save("mtc_participants",participants);toast("Participant deleted.");render();}
+
+document.getElementById("search").oninput=render;
+document.getElementById("filterClinic").onchange=render;
+document.getElementById("filterPayment").onchange=render;
+document.getElementById("filterSession").onchange=render;
+document.getElementById("exportPdf").onclick=()=>{const prevTitle=document.title;const cohort=selectedCohortId==="all"?"All Cohorts":(cohortById(selectedCohortId)?.name||"Cohort");document.title="Mariz Talent Clinic - "+cohort+" Roster";window.print();document.title=prevTitle;};
+
+
+document.getElementById("resetBtn").onclick=()=>{if(!confirm("Reset all data to demo sample?"))return;localStorage.removeItem("mtc_cohorts");localStorage.removeItem("mtc_participants");cohorts=[];participants=[];seedDemo();render();toast("Demo data reset.");};
+
+function filteredParticipants(){const q=document.getElementById("search").value.trim().toLowerCase();const fc=document.getElementById("filterClinic").value;const fp=document.getElementById("filterPayment").value;const fs=document.getElementById("filterSession").value;return participants.filter(p=>{if(selectedCohortId!=="all"&&p.cohortId!==selectedCohortId)return false;if(fc&&p.clinic!==fc)return false;if(fp&&p.paymentStatus!==fp)return false;if(fs&&p.session!==fs)return false;if(q){const hay=(p.regNo+" "+p.name+" "+p.contact+" "+p.address).toLowerCase();if(!hay.includes(q))return false;}return true;});}
+
+function render(){ 
+  // sidebar cohort list
+  const list=document.getElementById("cohortList");
+  list.innerHTML=`<div class="cohort-item ${selectedCohortId==="all"?"active":""}" data-id="all"><div class="code">ALL</div><div class="nm">All Cohorts</div><div class="prog">${participants.length} participants</div></div>`+
+    cohorts.map(c=>{const p=cohortProgress(c);return `<div class="cohort-item ${selectedCohortId===c.id?"active":""}" data-id="${c.id}"><div class="code">${c.code}</div><div class="nm">${c.name}</div><div class="prog">${p.label}${p.daysLeft>0?" · "+p.daysLeft+"d":""}</div></div>`;}).join("");
+  list.querySelectorAll(".cohort-item").forEach(el=>el.onclick=()=>{selectedCohortId=el.dataset.id;document.querySelector(".sidebar").classList.remove("open");document.getElementById("overlay").classList.remove("open");render();});
+
+  // view title
+  if(selectedCohortId==="all"||!cohorts.find(c=>c.id===selectedCohortId)){document.getElementById("viewTitle").textContent="All Cohorts Overview";document.getElementById("viewSub").textContent=`Showing participants across ${cohorts.length} cohort(s).`;}else{const c=cohortById(selectedCohortId);document.getElementById("viewTitle").textContent=c.code+" — "+c.name;document.getElementById("viewSub").textContent=`${c.programSession||"Session TBD"} · ${c.durationWeeks||6} weeks`;document.getElementById("viewTitle").textContent=c.name;}
+
+  // banner
+  const banner=document.getElementById("cohortBanner");
+  if(selectedCohortId==="all"||!cohorts.find(c=>c.id===selectedCohortId)){banner.innerHTML=`<h3>All Cohorts Overview</h3><p class="meta">Showing participants across ${cohorts.length} cohort(s).</p>`;}else{const c=cohortById(selectedCohortId);const p=cohortProgress(c);const st=statusOf(c);banner.innerHTML=`<h3>${c.code} — ${c.name}</h3><div class="meta"><span>Start: <b>${fmtDate(c.startDate)}</b></span><span>End: <b>${fmtDate(c.endDate)}</b></span><span>Fee: <b>${Number(c.fee).toLocaleString()} UGX</b></span><span>Status: <b>${st}</b></span><span>Progress: <b>${p.label}${p.daysLeft>0?" · "+p.daysLeft+" days remaining":""}</b></span></div><div class="progress"><div style="width:${p.pct}%"></div></div><div class="weeks">${[1,2,3,4,5,6].map(w=>`<div class="week ${w<p.week?"done":(w===p.week?"current":"")}">Week ${w}</div>`).join("")}</div>`;}
+
+  // kpis
+  const fp=filteredParticipants();
+  const subset = selectedCohortId==="all"? participants : participants.filter(p=>p.cohortId===selectedCohortId);
+  const total=subset.length; const cleared=subset.filter(p=>p.paymentStatus==="Free / Waived"||p.paymentStatus==="Paid in Full").length; const pending=total-cleared;
+  const collected=subset.reduce((s,p)=>s+(p.amountPaid||0),0); const outstanding=subset.reduce((s,p)=>s+(p.balance||0),0);
+  document.getElementById("kpis").innerHTML=`<div class="kpi"><div class="label">Registered Participants</div><div class="value">${total}</div><div class="hint">In selected cohort</div></div><div class="kpi"><div class="label">Cleared (Free/Paid)</div><div class="value">${cleared}</div><div class="hint">${pending} pending/partial</div></div><div class="kpi"><div class="label">Fees Collected</div><div class="value">${collected.toLocaleString()}</div><div class="hint">UGX</div></div><div class="kpi"><div class="label">Outstanding Balance</div><div class="value">${outstanding.toLocaleString()}</div><div class="hint">UGX</div></div>`;
+
+  // analytics
+  const clinicCounts={}; CLINICS.forEach(c=>clinicCounts[c]=0); subset.forEach(p=>{if(clinicCounts[p.clinic]!=null)clinicCounts[p.clinic]++;});
+  const maxC=Math.max(1,...Object.values(clinicCounts));
+  document.getElementById("clinicBars").innerHTML=CLINICS.map(c=>`<div class="barrow"><div class="name">${c}</div><div class="track"><div class="fill" style="width:${(clinicCounts[c]/maxC*100)}%"></div></div><div class="count">${clinicCounts[c]}</div></div>`).join("");
+  const sessCounts={}; SESSIONS.forEach(s=>sessCounts[s]=0); subset.forEach(p=>{if(sessCounts[p.session]!=null)sessCounts[p.session]++;});
+  const maxS=Math.max(1,...Object.values(sessCounts));
+  document.getElementById("sessionBars").innerHTML=SESSIONS.map(s=>`<div class="barrow"><div class="name">${s.split(" (")[0]}</div><div class="track"><div class="fill" style="width:${(sessCounts[s]/maxS*100)}%"></div></div><div class="count">${sessCounts[s]}</div></div>`).join("");
+
+  // table
+  const tbody=document.getElementById("tbody");
+  if(fp.length===0){tbody.innerHTML="";document.getElementById("empty").style.display="block";}else{document.getElementById("empty").style.display="none";tbody.innerHTML=fp.map(p=>{const badgeClass=p.paymentStatus==="Free / Waived"?"b-free":p.paymentStatus==="Paid in Full"?"b-paid":p.paymentStatus==="Partial Payment"?"b-partial":"b-pending";return `<tr><td class="regno">${p.regNo}</td><td class="namecell"><div class="nm">${p.name}</div><div class="ct">${p.contact}</div></td><td>${p.address||"—"}</td><td>${p.clinic}</td><td style="font-size:11px">${p.session.split(" (")[0]}</td><td style="font-size:12px">${fmtDate(p.startDate)}</td><td><span class="badge ${badgeClass}">${p.paymentStatus}</span></td><td class="bal ${p.balance===0?"zero":""}">${Number(p.balance).toLocaleString()}</td><td><div class="actions">${p.balance>0?`<button class="btn btn-primary btn-sm" onclick="openPay('${p.id}')">+ Pay</button>`:""}<button class="btn btn-ghost btn-sm" onclick="openPartModal('${p.id}')">Edit</button><button class="btn btn-danger btn-sm" onclick="deletePart('${p.id}')">Delete</button></div></td></tr>`;}).join("");}
+}
+
+function initFilters(){const fc=document.getElementById("filterClinic");fc.innerHTML=`<option value="">All Clinics</option>`+CLINICS.map(c=>`<option>${c}</option>`).join("");const fs=document.getElementById("filterSession");fs.innerHTML=`<option value="">All Sessions</option>`+SESSIONS.map(s=>`<option value="${s}">${s.split(" (")[0]}</option>`).join("");}
+initFilters();
+document.getElementById("menuBtn").onclick = () => { document.querySelector(".sidebar").classList.add("open"); document.getElementById("overlay").classList.add("open"); };
+document.getElementById("overlay").onclick = () => { document.querySelector(".sidebar").classList.remove("open"); document.getElementById("overlay").classList.remove("open"); };
+seedDemo();
+render();
+</script>
+</body>
+</html>
