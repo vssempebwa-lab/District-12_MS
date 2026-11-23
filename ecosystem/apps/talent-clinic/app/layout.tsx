@@ -7,9 +7,9 @@ export const metadata: Metadata = {
   title: `${TENANT.shortName} — District 12`,
   description: `${TENANT.name}: ${TENANT.tagline}. Part of the District 12 group ecosystem.`,
   icons: {
-    icon: "/brand/mariz-mark.png",
-    shortcut: "/brand/mariz-mark.png",
-    apple: "/brand/mariz-mark.png",
+    icon: "/brand/talent-clinic-mark.png",
+    shortcut: "/brand/talent-clinic-mark.png",
+    apple: "/brand/talent-clinic-mark.png",
   },
 };
 
