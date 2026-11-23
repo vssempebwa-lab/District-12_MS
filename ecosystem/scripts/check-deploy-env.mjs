@@ -33,6 +33,7 @@ const TENANTS = [
   ["rub-shoots", "NEXT_PUBLIC_D12_RUB_SHOOTS_URL"],
   ["shop-for-me", "NEXT_PUBLIC_D12_SHOP_FOR_ME_URL"],
   ["expresso-point", "NEXT_PUBLIC_D12_EXPRESSO_POINT_URL"],
+  ["talent-clinic", "NEXT_PUBLIC_D12_TALENT_CLINIC_URL"],
 ];
 
 const DEV_SECRET = "d12-dev-session-secret-change-me";

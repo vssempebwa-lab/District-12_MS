@@ -1,0 +1,54 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  :root {
+    --background: 220 20% 97%;
+    --foreground: 222 32% 9%;
+    --card: 0 0% 100%;
+    --card-foreground: 222 32% 9%;
+    --popover: 0 0% 100%;
+    --popover-foreground: 222 32% 9%;
+    --primary: 0 70% 39%;
+    --primary-foreground: 0 0% 100%;
+    --secondary: 220 15% 95%;
+    --secondary-foreground: 222 25% 12%;
+    --muted: 220 16% 96%;
+    --muted-foreground: 220 10% 38%;
+    --accent: 0 70% 96%;
+    --accent-foreground: 0 70% 32%;
+    --destructive: 0 72% 45%;
+    --destructive-foreground: 0 0% 100%;
+    --border: 220 14% 84%;
+    --input: 220 12% 78%;
+    --ring: 0 70% 39%;
+    --chart-1: 0 70% 39%;
+    --chart-2: 220 25% 18%;
+    --chart-3: 30 90% 42%;
+    --chart-4: 190 90% 32%;
+    --chart-5: 265 70% 48%;
+    --radius: 0.55rem;
+  }
+
+  * {
+    @apply border-border;
+  }
+
+  body {
+    @apply bg-background text-foreground antialiased;
+    font-family: "Segoe UI", "Helvetica Neue", Arial, system-ui, sans-serif;
+  }
+
+  ::selection {
+    background: hsl(var(--primary));
+    color: white;
+  }
+}
+
+@layer utilities {
+  .scrollbar-thin {
+    scrollbar-width: thin;
+    scrollbar-color: hsl(var(--border)) transparent;
+  }
+}

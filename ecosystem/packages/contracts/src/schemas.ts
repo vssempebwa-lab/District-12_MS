@@ -9,6 +9,7 @@ export const LEAD_STAGES = ["new", "contacted", "qualified", "won", "lost"] as c
 export const CUSTOMER_TIERS = ["key", "growth", "standard"] as const;
 export const CUSTOMER_STATUSES = ["active", "dormant", "paid"] as const;
 export const SALE_STATUSES = ["paid", "pending", "refunded"] as const;
+export const SALE_PAYMENT_TYPES = ["full", "partial"] as const;
 export const TASK_PRIORITIES = ["high", "medium", "low"] as const;
 export const TASK_STATUSES = ["open", "in_progress", "done"] as const;
 export const PROJECT_STATUSES = ["planned", "active", "on_hold", "completed", "cancelled"] as const;
@@ -75,6 +76,17 @@ export const customerInputSchema = z.object({
   lastOrder: optionalDate,
   issueOn: optionalDate,
   services: z.array(serviceLineSchema).max(20).default([]),
+  // Talent Clinic participant details (optional for other subsidiaries).
+  registrationNumber: shortText(40),
+  clinic: shortText(40),
+  programSession: shortText(40),
+  cohort: shortText(80),
+  startDate: optionalDate,
+  // Mariz partial-payment tracking, mirrored on the customer for quick reference.
+  paidTotal: z.coerce.number().min(0).max(1_000_000_000_000).default(0),
+  lastPaymentOn: optionalDate,
+  lastPaymentBy: shortText(80),
+  lastPaymentByEmail: shortText(120),
 });
 
 export const saleInputSchema = z.object({
@@ -82,10 +94,20 @@ export const saleInputSchema = z.object({
   description: z.string().trim().min(1, "Description is required").max(160),
   customerId: shortText(60),
   customerName: shortText(120),
+  customerPhone: shortText(40),
+  customerEmail: emailOrBlank,
   amount: z.coerce.number().min(0).max(1_000_000_000_000).default(0),
   status: z.enum(SALE_STATUSES).default("pending"),
   channel: z.string().trim().max(60).default("Direct"),
   owner: shortText(80),
+  // Mariz partial-payment details: who collected the money and how it relates
+  // to the customer's agreed value.
+  paymentType: z.enum(SALE_PAYMENT_TYPES).default("full"),
+  collectedBy: shortText(80),
+  collectedByEmail: shortText(120),
+  agreedValue: z.coerce.number().min(0).max(1_000_000_000_000).default(0),
+  balanceAfter: z.coerce.number().min(0).max(1_000_000_000_000).default(0),
+  installmentNo: z.coerce.number().int().min(0).max(10_000).default(0),
 });
 
 export const taskInputSchema = z.object({
@@ -136,6 +158,9 @@ export const projectInputSchema = z.object({
   spent: z.coerce.number().min(0).max(1_000_000_000_000).default(0),
   progress: z.coerce.number().min(0).max(100).default(0),
   dueOn: optionalDate,
+  startDate: optionalDate,
+  durationWeeks: z.coerce.number().min(1).max(52).default(6),
+  programSession: shortText(40),
   owner: shortText(80),
   description: shortText(240),
 });

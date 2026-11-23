@@ -142,6 +142,10 @@ create table if not exists public.d12_ops_customers (
   owner text,
   lifetime_value numeric(16, 2) not null default 0,
   last_order date,
+  paid_total numeric(16, 2) not null default 0,
+  last_payment_on date,
+  last_payment_by text not null default '',
+  last_payment_by_email text not null default '',
   created_at timestamptz not null default now(),
   updated_at timestamptz not null default now()
 );
@@ -154,9 +158,18 @@ create table if not exists public.d12_ops_sales (
   description text not null,
   customer_id text,
   customer_name text,
+  customer_phone text not null default '',
+  customer_email text not null default '',
   amount numeric(16, 2) not null default 0,
   status text not null default 'pending' check (status in ('paid', 'pending', 'refunded')),
   channel text,
+  owner text not null default '',
+  payment_type text not null default 'full' check (payment_type in ('full', 'partial')),
+  collected_by text not null default '',
+  collected_by_email text not null default '',
+  agreed_value numeric(16, 2) not null default 0,
+  balance_after numeric(16, 2) not null default 0,
+  installment_no integer not null default 0,
   created_at timestamptz not null default now(),
   updated_at timestamptz not null default now()
 );
@@ -815,7 +828,10 @@ values
    'shopforme.district12.co.ug', 'http://localhost:3004', 3004, 'active'),
   ('expresso-point', 'Expresso Point', 'Expresso', 'Coffee & hospitality', 'EP', '#92400E',
    'The daily cup, done properly', 'Hadijah Nakimuli',
-   'expresso.district12.co.ug', 'http://localhost:3005', 3005, 'active')
+   'expresso.district12.co.ug', 'http://localhost:3005', 3005, 'active'),
+   ('talent-clinic', 'Talent Clinic', 'Talent Clinic', 'Talent development & training', 'TC', '#7C3AED',
+    'Six-week clinics that build real skills', 'Talent Clinic Lead',
+    'talentclinic.district12.co.ug', 'http://localhost:3006', 3006, 'active')
 on conflict (id) do nothing;
 
 insert into public.d12_iam_roles (id, label, scope, rank, permissions, description)
@@ -845,7 +861,8 @@ values
   ('usr_patricia', 'Patricia Namusoke', 'patricia@rubshoots.ug', 'active'),
   ('usr_andrew', 'Andrew Ochieng', 'andrew@shopforme.ug', 'active'),
   ('usr_hadijah', 'Hadijah Nakimuli', 'hadijah@expresso.ug', 'active'),
-  ('usr_brian', 'Brian Ssemakula', 'brian@passito.ug', 'active')
+  ('usr_brian', 'Brian Ssemakula', 'brian@passito.ug', 'active'),
+  ('usr_talent_clinic', 'Talent Clinic', 'talentclinic@district12.co.ug', 'active')
 on conflict do nothing;
 
 insert into public.d12_iam_grants (id, user_id, role_id, tenant_id, granted_by)
@@ -857,7 +874,8 @@ values
   ('grt_patricia_rub', 'usr_patricia', 'tenant_admin', 'rub-shoots', 'usr_marvin'),
   ('grt_andrew_shop', 'usr_andrew', 'tenant_admin', 'shop-for-me', 'usr_marvin'),
   ('grt_hadijah_expresso', 'usr_hadijah', 'tenant_admin', 'expresso-point', 'usr_marvin'),
-  ('grt_brian_passito', 'usr_brian', 'manager', 'passito', 'usr_marvin')
+  ('grt_brian_passito', 'usr_brian', 'manager', 'passito', 'usr_marvin'),
+  ('grt_talent_clinic', 'usr_talent_clinic', 'tenant_admin', 'talent-clinic', 'usr_marvin')
 on conflict do nothing;
 
 -- After creating matching Supabase Auth users, link them so RLS resolves the
@@ -2372,6 +2390,21 @@ notify pgrst, 'reload schema';
 
 alter table public.d12_ops_sales add column if not exists owner text not null default '';
 alter table public.d12_ops_invoices add column if not exists owner text not null default '';
+
+-- Mariz partial payments: capture customer contact details and who collected each payment.
+alter table public.d12_ops_sales add column if not exists customer_phone text not null default '';
+alter table public.d12_ops_sales add column if not exists customer_email text not null default '';
+alter table public.d12_ops_sales add column if not exists payment_type text not null default 'full';
+alter table public.d12_ops_sales add column if not exists collected_by text not null default '';
+alter table public.d12_ops_sales add column if not exists collected_by_email text not null default '';
+alter table public.d12_ops_sales add column if not exists agreed_value numeric(16, 2) not null default 0;
+alter table public.d12_ops_sales add column if not exists balance_after numeric(16, 2) not null default 0;
+alter table public.d12_ops_sales add column if not exists installment_no integer not null default 0;
+
+alter table public.d12_ops_customers add column if not exists paid_total numeric(16, 2) not null default 0;
+alter table public.d12_ops_customers add column if not exists last_payment_on date;
+alter table public.d12_ops_customers add column if not exists last_payment_by text not null default '';
+alter table public.d12_ops_customers add column if not exists last_payment_by_email text not null default '';
 
 update public.d12_ops_sales s
 set owner = c.owner

@@ -38,26 +38,30 @@ interface NavItem {
   icon: LucideIcon;
   permissions?: string[];
   tenants?: TenantId[];
+  hiddenFor?: TenantId[];
+  labels?: Partial<Record<TenantId, string>>;
 }
+
+const TALENT_CLINIC_HIDDEN = ["talent-clinic"] as const;
 
 const ITEMS: NavItem[] = [
   { href: "/", label: "Overview", icon: LayoutDashboard },
-  { href: "/leads", label: "Leads", icon: Users, permissions: ["leads.read"] },
-  { href: "/customers", label: "Customers", icon: Building2, permissions: ["customers.read"] },
-  { href: "/sales", label: "Sales", icon: Receipt, permissions: ["sales.read"] },
-  { href: "/tasks", label: "Tasks", icon: CheckSquare, permissions: ["tasks.read"] },
-  { href: "/meetings", label: "Meetings", icon: CalendarDays, permissions: ["meetings.read"], tenants: ["mariz"] },
-  { href: "/calls", label: "Calls", icon: PhoneCall, permissions: ["calls.read"], tenants: ["mariz"] },
-  { href: "/projects", label: "Projects", icon: Folder, permissions: ["projects.read"] },
-  { href: "/inventory", label: "Inventory", icon: Package, permissions: ["inventory.read"] },
-  { href: "/transactions", label: "Finance", icon: Wallet, permissions: ["transactions.read"] },
-  { href: "/invoices", label: "Invoices", icon: FileText, permissions: ["invoices.read"] },
-  { href: "/staff", label: "Staff", icon: UsersRound, permissions: ["staff.read"] },
-  { href: "/desk/reports", label: "Reports", icon: Send, permissions: ["reports.submit"] },
-  { href: "/desk/team", label: "Team management", icon: UserCog, permissions: ["team.manage"] },
-  { href: "/desk/shifts", label: "Shift sign-outs", icon: Clock3, permissions: ["shifts.read"] },
-  { href: "/reports", label: "Analytics", icon: BarChart3, permissions: ["reports.read", "sales.read"] },
-  { href: "/desk/notifications", label: "Notifications", icon: Bell, permissions: ["notifications.read"] },
+  { href: "/leads", label: "Leads", icon: Users, permissions: ["leads.read"], hiddenFor: [...TALENT_CLINIC_HIDDEN] },
+  { href: "/customers", label: "Customers", icon: Building2, permissions: ["customers.read"], labels: { "talent-clinic": "Participants" } },
+  { href: "/sales", label: "Sales", icon: Receipt, permissions: ["sales.read"], hiddenFor: [...TALENT_CLINIC_HIDDEN] },
+  { href: "/tasks", label: "Tasks", icon: CheckSquare, permissions: ["tasks.read"], hiddenFor: [...TALENT_CLINIC_HIDDEN] },
+  { href: "/meetings", label: "Meetings", icon: CalendarDays, permissions: ["meetings.read"], tenants: ["mariz"], hiddenFor: [...TALENT_CLINIC_HIDDEN] },
+  { href: "/calls", label: "Calls", icon: PhoneCall, permissions: ["calls.read"], tenants: ["mariz"], hiddenFor: [...TALENT_CLINIC_HIDDEN] },
+  { href: "/projects", label: "Projects", icon: Folder, permissions: ["projects.read"], labels: { "talent-clinic": "Cohorts" } },
+  { href: "/inventory", label: "Inventory", icon: Package, permissions: ["inventory.read"], hiddenFor: [...TALENT_CLINIC_HIDDEN] },
+  { href: "/transactions", label: "Finance", icon: Wallet, permissions: ["transactions.read"], hiddenFor: [...TALENT_CLINIC_HIDDEN] },
+  { href: "/invoices", label: "Invoices", icon: FileText, permissions: ["invoices.read"], hiddenFor: [...TALENT_CLINIC_HIDDEN] },
+  { href: "/staff", label: "Staff", icon: UsersRound, permissions: ["staff.read"], hiddenFor: [...TALENT_CLINIC_HIDDEN] },
+  { href: "/desk/reports", label: "Reports", icon: Send, permissions: ["reports.submit"], hiddenFor: [...TALENT_CLINIC_HIDDEN] },
+  { href: "/desk/team", label: "Team management", icon: UserCog, permissions: ["team.manage"], hiddenFor: [...TALENT_CLINIC_HIDDEN] },
+  { href: "/desk/shifts", label: "Shift sign-outs", icon: Clock3, permissions: ["shifts.read"], hiddenFor: [...TALENT_CLINIC_HIDDEN] },
+  { href: "/reports", label: "Analytics", icon: BarChart3, permissions: ["reports.read", "sales.read"], hiddenFor: [...TALENT_CLINIC_HIDDEN] },
+  { href: "/desk/notifications", label: "Notifications", icon: Bell, permissions: ["notifications.read"], hiddenFor: [...TALENT_CLINIC_HIDDEN] },
   { href: "/desk/settings", label: "Settings", icon: Settings },
   { href: "/desk/profile", label: "Profile", icon: UserRound },
 ];
@@ -119,8 +123,12 @@ export function TenantShell({
   const items = ITEMS.filter(
     (item) =>
       allowsAll(permissions, item.permissions) &&
-      (!item.tenants || item.tenants.includes(tenant.id)),
-  );
+      (!item.tenants || item.tenants.includes(tenant.id)) &&
+      !(item.hiddenFor ?? []).includes(tenant.id),
+  ).map((item) => ({
+    ...item,
+    label: item.labels?.[tenant.id] ?? item.label,
+  }));
   const activeItem = items.find((item) => isActive(pathname, item.href)) ?? items[0];
   const activeColor = accent || tenant.color;
   const compact = density === "compact";

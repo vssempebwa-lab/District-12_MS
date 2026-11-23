@@ -85,6 +85,15 @@ export const DEMO_ACCOUNTS: DemoAccount[] = [
     homeTenant: "expresso-point",
   },
   {
+    id: "usr_talent_clinic",
+    name: "Talent Clinic",
+    email: "talentclinic@district12.co.ug",
+    title: "Talent Clinic administrator",
+    roles: ["tenant_admin"],
+    tenants: ["talent-clinic"],
+    homeTenant: "talent-clinic",
+  },
+  {
     id: "usr_brian",
     name: "Brian Ssemakula",
     email: "brian@passito.ug",

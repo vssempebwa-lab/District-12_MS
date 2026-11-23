@@ -97,6 +97,7 @@ function toneFor(value: string): Tone {
   switch (value) {
     case "won":
     case "paid":
+    case "full":
     case "active":
     case "done":
     case "completed":
@@ -115,6 +116,7 @@ function toneFor(value: string): Tone {
       return "info";
     case "contacted":
     case "pending":
+    case "partial":
     case "medium":
     case "on_hold":
     case "on_leave":
@@ -456,6 +458,22 @@ function renderCell(
       <Badge tone={toneFor(value)}>{titleCase(value)}</Badge>
     ) : (
       <span className="text-ink-mute">—</span>
+    );
+  }
+  if (column.kind === "countdown") {
+    const start = text(row.startDate || row.startOn || row.issueOn);
+    const weeks = Number(row.durationWeeks ?? row.duration ?? 6) || 6;
+    if (!start) return <span className="text-ink-mute">—</span>;
+    const end = new Date(start);
+    end.setDate(end.getDate() + weeks * 7);
+    const now = new Date();
+    const days = Math.ceil((end.getTime() - now.getTime()) / 86_400_000);
+    if (days < 0) return <span className="text-xs font-medium text-red-600">Ended</span>;
+    if (days === 0) return <span className="text-xs font-medium text-amber-600">Ends today</span>;
+    return (
+      <span className="text-xs font-medium text-emerald-700">
+        {days} day{days === 1 ? "" : "s"} left
+      </span>
     );
   }
   if (column.kind === "muted") {
@@ -1175,6 +1193,25 @@ export function OpsBoard({
                   onChange={(event) => setPayAmount(event.target.value)}
                   placeholder="0"
                 />
+                <div className="mt-1.5 flex flex-wrap gap-1">
+                  {[0.25, 0.5, 0.75, 1].map((fraction) => {
+                    const remaining = Math.max(
+                      agreedValueFor(paying) - (paidByCustomer.get(paying.id) ?? 0),
+                      0,
+                    );
+                    const value = Math.round(remaining * fraction * 100) / 100;
+                    return (
+                      <button
+                        key={fraction}
+                        type="button"
+                        onClick={() => setPayAmount(String(value))}
+                        className="rounded-md border border-line px-2 py-0.5 text-[11px] text-ink-soft hover:bg-canvas hover:text-ink"
+                      >
+                        {fraction === 1 ? "Full" : `${Math.round(fraction * 100)}%`}
+                      </button>
+                    );
+                  })}
+                </div>
               </Field>
               <Field label="Payment date">
                 <Input
@@ -1184,6 +1221,21 @@ export function OpsBoard({
                 />
               </Field>
             </div>
+            {paying ? (
+              <p className="text-[11px] leading-relaxed text-ink-mute">
+                Balance after this payment:{" "}
+                <span className="font-semibold text-ink">
+                  {formatUgx(
+                    Math.max(
+                      agreedValueFor(paying) -
+                        ((paidByCustomer.get(paying.id) ?? 0) + (Number(payAmount) || 0)),
+                      0,
+                    ),
+                  )}
+                </span>
+                . Amounts above the outstanding balance are recorded only up to the balance.
+              </p>
+            ) : null}
             <p className="text-[11px] leading-relaxed text-ink-mute">
               Paying the full remaining balance marks the customer as paid automatically. Amounts
               above the balance are recorded only up to the balance.

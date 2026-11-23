@@ -9,6 +9,7 @@ import {
   MEETING_STATUSES,
   PROJECT_STATUSES,
   SALE_STATUSES,
+  SALE_PAYMENT_TYPES,
   STAFF_STATUSES,
   TASK_PRIORITIES,
   TASK_STATUSES,
@@ -37,7 +38,7 @@ export interface FieldConfig {
 export interface ColumnConfig {
   key: string;
   label: string;
-  kind?: "text" | "currency" | "percent" | "date" | "badge" | "muted" | "stacked" | "services" | "paid";
+  kind?: "text" | "currency" | "percent" | "date" | "badge" | "muted" | "stacked" | "services" | "paid" | "countdown";
   align?: "left" | "right";
 }
 
@@ -131,8 +132,11 @@ export const ENTITY_CONFIG: Record<OpsEntity, EntityConfig> = {
     columns: [
       { key: "description", label: "Sale", kind: "stacked" },
       { key: "status", label: "Status", kind: "badge" },
+      { key: "paymentType", label: "Type", kind: "badge" },
       { key: "amount", label: "Amount", kind: "currency", align: "right" },
       { key: "channel", label: "Channel" },
+      { key: "customerName", label: "Customer" },
+      { key: "collectedBy", label: "Collected by" },
       { key: "owner", label: "Owner" },
       { key: "occurredOn", label: "Date", kind: "date", align: "right" },
     ],
@@ -140,10 +144,18 @@ export const ENTITY_CONFIG: Record<OpsEntity, EntityConfig> = {
       { key: "description", label: "Description", type: "text", required: true, wide: true },
       { key: "customerName", label: "Customer", type: "text" },
       { key: "customerId", label: "Customer id", type: "text", placeholder: "Optional link" },
+      { key: "customerPhone", label: "Customer phone", type: "text" },
+      { key: "customerEmail", label: "Customer email", type: "email" },
       { key: "amount", label: "Amount (UGX)", type: "number" },
       { key: "status", label: "Status", type: "select", options: options(SALE_STATUSES) },
+      { key: "paymentType", label: "Payment type", type: "select", options: options(SALE_PAYMENT_TYPES) },
       { key: "channel", label: "Channel", type: "text" },
       { key: "owner", label: "Owner", type: "text", placeholder: "Account executive" },
+      { key: "collectedBy", label: "Collected by", type: "text", placeholder: "Employee who received the payment" },
+      { key: "collectedByEmail", label: "Collected by email", type: "email" },
+      { key: "agreedValue", label: "Agreed value (UGX)", type: "number" },
+      { key: "balanceAfter", label: "Balance after (UGX)", type: "number" },
+      { key: "installmentNo", label: "Installment no.", type: "number" },
       { key: "occurredOn", label: "Date", type: "date", required: true, wide: true },
     ],
     defaults: { status: "paid", channel: "Direct", amount: 0 },
@@ -406,6 +418,8 @@ const MARIZ_CUSTOMERS: EntityConfig = {
     { key: "issueOn", label: "Issued", kind: "date", align: "right" },
     { key: "owner", label: "Owner" },
     { key: "paid", label: "Paid / agreed", kind: "paid", align: "right" },
+    { key: "lastPaymentOn", label: "Last payment", kind: "date", align: "right" },
+    { key: "lastPaymentBy", label: "Collected by" },
   ],
   fields: [
     { key: "name", label: "Customer name", type: "text", required: true },
@@ -417,10 +431,14 @@ const MARIZ_CUSTOMERS: EntityConfig = {
     { key: "tier", label: "Tier", type: "select", options: options(CUSTOMER_TIERS) },
     { key: "status", label: "Status", type: "select", options: options(CUSTOMER_STATUSES) },
     { key: "owner", label: "Customer owner", type: "text" },
+    { key: "paidTotal", label: "Paid total (UGX)", type: "number" },
+    { key: "lastPaymentOn", label: "Last payment date", type: "date" },
+    { key: "lastPaymentBy", label: "Last collected by", type: "text" },
+    { key: "lastPaymentByEmail", label: "Last collected by email", type: "email" },
     { key: "lifetimeValue", label: "Lifetime value (UGX)", type: "number" },
     { key: "lastOrder", label: "Last order", type: "date", wide: true },
   ],
-  defaults: { tier: "standard", status: "active", lifetimeValue: 0, lastOrder: "", issueOn: TODAY },
+  defaults: { tier: "standard", status: "active", lifetimeValue: 0, lastOrder: "", issueOn: TODAY, paidTotal: 0, lastPaymentOn: "", lastPaymentBy: "", lastPaymentByEmail: "" },
 };
 
 const MARIZ_TASKS: EntityConfig = {
@@ -449,7 +467,102 @@ const MARIZ_OVERRIDES: Partial<Record<OpsEntity, EntityConfig>> = {
   tasks: MARIZ_TASKS,
 };
 
+const CLINIC_OPTIONS: FieldOption[] = [
+  { value: "digital", label: "Digital clinic" },
+  { value: "creative", label: "Creative clinic" },
+  { value: "sales", label: "Sales clinic" },
+];
+
+const SESSION_OPTIONS: FieldOption[] = [
+  { value: "morning", label: "8:00am – 12:00pm" },
+  { value: "afternoon", label: "12:00pm – 4:00pm" },
+];
+
+const TALENT_CLINIC_CUSTOMERS: EntityConfig = {
+  ...ENTITY_CONFIG.customers,
+  description: "Clinic participants with registration, clinic module, cohort and payment status.",
+  columns: [
+    { key: "name", label: "Participant", kind: "stacked" },
+    { key: "registrationNumber", label: "Reg. no." },
+    { key: "clinic", label: "Clinic", kind: "badge" },
+    { key: "cohort", label: "Cohort" },
+    { key: "status", label: "Payment", kind: "badge" },
+    { key: "startDate", label: "Start", kind: "date", align: "right" },
+    { key: "programSession", label: "Session" },
+    { key: "paid", label: "Paid / fee", kind: "paid", align: "right" },
+    { key: "lastPaymentOn", label: "Last payment", kind: "date", align: "right" },
+  ],
+  fields: [
+    { key: "name", label: "Full names", type: "text", required: true },
+    { key: "registrationNumber", label: "Registration number", type: "text", required: true },
+    { key: "email", label: "Email address", type: "email" },
+    { key: "phone", label: "Contact", type: "text" },
+    { key: "clinic", label: "Clinic", type: "select", options: CLINIC_OPTIONS, required: true },
+    { key: "cohort", label: "Cohort", type: "text", placeholder: "Cohort name" },
+    { key: "startDate", label: "Start date", type: "date" },
+    { key: "programSession", label: "Programme session", type: "select", options: SESSION_OPTIONS },
+    { key: "status", label: "Payment status", type: "select", options: options(CUSTOMER_STATUSES) },
+    { key: "owner", label: "Owner", type: "text" },
+    { key: "lifetimeValue", label: "Registration fee (UGX)", type: "number" },
+    { key: "paidTotal", label: "Paid total (UGX)", type: "number" },
+    { key: "lastPaymentOn", label: "Last payment date", type: "date" },
+    { key: "lastPaymentBy", label: "Last collected by", type: "text" },
+  ],
+  defaults: {
+    tier: "standard",
+    status: "active",
+    lifetimeValue: 0,
+    lastOrder: "",
+    issueOn: TODAY,
+    paidTotal: 0,
+    lastPaymentOn: "",
+    lastPaymentBy: "",
+    lastPaymentByEmail: "",
+    clinic: "digital",
+    programSession: "morning",
+    startDate: TODAY,
+  },
+};
+
+const TALENT_CLINIC_PROJECTS: EntityConfig = {
+  ...ENTITY_CONFIG.projects,
+  description: "Six-week cohorts with a start date and countdown to completion.",
+  columns: [
+    { key: "name", label: "Cohort", kind: "stacked" },
+    { key: "startDate", label: "Start", kind: "date", align: "right" },
+    { key: "durationWeeks", label: "Weeks", align: "right" },
+    { key: "programSession", label: "Session" },
+    { key: "status", label: "Status", kind: "badge" },
+    { key: "countdown", label: "Countdown", align: "right" },
+  ],
+  fields: [
+    { key: "name", label: "Cohort name", type: "text", required: true, wide: true },
+    { key: "startDate", label: "Start date", type: "date", required: true },
+    { key: "durationWeeks", label: "Duration (weeks)", type: "number" },
+    { key: "programSession", label: "Programme session", type: "select", options: SESSION_OPTIONS },
+    { key: "status", label: "Status", type: "select", options: options(PROJECT_STATUSES) },
+    { key: "owner", label: "Owner", type: "text" },
+    { key: "description", label: "Notes", type: "textarea", wide: true },
+  ],
+  defaults: {
+    status: "active",
+    budget: 0,
+    spent: 0,
+    progress: 0,
+    dueOn: "",
+    startDate: TODAY,
+    durationWeeks: 6,
+    programSession: "morning",
+  },
+};
+
+const TALENT_CLINIC_OVERRIDES: Partial<Record<OpsEntity, EntityConfig>> = {
+  customers: TALENT_CLINIC_CUSTOMERS,
+  projects: TALENT_CLINIC_PROJECTS,
+};
+
 export function entityConfigFor(entity: OpsEntity, tenantId?: TenantId): EntityConfig {
   if (tenantId === "mariz") return MARIZ_OVERRIDES[entity] ?? ENTITY_CONFIG[entity];
+  if (tenantId === "talent-clinic") return TALENT_CLINIC_OVERRIDES[entity] ?? ENTITY_CONFIG[entity];
   return ENTITY_CONFIG[entity];
 }

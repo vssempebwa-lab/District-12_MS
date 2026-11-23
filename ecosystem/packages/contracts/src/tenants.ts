@@ -4,6 +4,7 @@ export const TENANT_IDS = [
   "rub-shoots",
   "shop-for-me",
   "expresso-point",
+  "talent-clinic",
 ] as const;
 
 export type TenantId = (typeof TENANT_IDS)[number];
@@ -90,6 +91,20 @@ export const TENANTS: Record<TenantId, TenantMeta> = {
     domain: "expresso.district12.co.ug",
     port: 3005,
   },
+  "talent-clinic": {
+    id: "talent-clinic",
+    name: "Talent Clinic",
+    shortName: "Talent Clinic",
+    sector: "Talent development & training",
+    mark: "TC",
+    color: "#7C3AED",
+    accent: "#A78BFA",
+    logo: "/brand/talent-clinic-mark.png",
+    tagline: "Six-week clinics that build real skills",
+    managingDirector: "Talent Clinic Lead",
+    domain: "talentclinic.district12.co.ug",
+    port: 3006,
+  },
 };
 
 // Literal env lookups so Next.js can inline these in client bundles.
@@ -99,6 +114,7 @@ const APP_URLS: Record<TenantId, string | undefined> = {
   "rub-shoots": process.env.NEXT_PUBLIC_D12_RUB_SHOOTS_URL,
   "shop-for-me": process.env.NEXT_PUBLIC_D12_SHOP_FOR_ME_URL,
   "expresso-point": process.env.NEXT_PUBLIC_D12_EXPRESSO_POINT_URL,
+  "talent-clinic": process.env.NEXT_PUBLIC_D12_TALENT_CLINIC_URL,
 };
 
 export function isTenantId(value: string): value is TenantId {

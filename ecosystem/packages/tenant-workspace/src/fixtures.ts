@@ -139,6 +139,29 @@ const FIXTURES: Record<TenantId, TenantFixture> = {
     leadValue: 260_000,
     saleSize: 140_000,
   },
+  "talent-clinic": {
+    clients: [
+      "Cohort Alpha participants",
+      "Cohort Beta participants",
+      "Cohort Gamma participants",
+      "Corporate trainees",
+      "Walk-in registrants",
+      "Partner referrals",
+    ],
+    offers: [
+      "Digital clinic registration",
+      "Creative clinic registration",
+      "Sales clinic registration",
+      "Cohort workshop",
+      "Mentorship session",
+      "Final showcase",
+    ],
+    team: ["Talent Clinic Lead", "Clinic Mentor", "Clinic Coordinator"],
+    roster: ["Talent Clinic Lead", "Clinic Mentor", "Clinic Coordinator", "Clinic Facilitator", "Clinic Assistant", "Clinic Administrator"],
+    supplies: ["Training manuals", "Laptops", "Projector", "Stationery"],
+    leadValue: 300_000,
+    saleSize: 300_000,
+  },
 };
 
 export interface TenantRecords {
@@ -266,6 +289,15 @@ export function seedRecords(tenantId: TenantId): TenantRecords {
     lifetimeValue: Math.round(fixture.saleSize * (6 + index * 1.5)),
     lastOrder: dateOffset(4 + index * 3),
     issueOn: dateOffset(60 - index * 7),
+    paidTotal: 0,
+    lastPaymentOn: "",
+    lastPaymentBy: "",
+    lastPaymentByEmail: "",
+    registrationNumber: "",
+    clinic: "digital",
+    programSession: "morning",
+    cohort: "",
+    startDate: dateOffset(60 - index * 7),
     services: [
       {
         service: ["recruitment", "call_support", "consultancy", "software_development", "digital_marketing"][
@@ -285,10 +317,18 @@ export function seedRecords(tenantId: TenantId): TenantRecords {
     description: fixture.offers[offerIndex],
     customerId: `cust_${tenantId}_${customerIndex + 1}`,
     customerName: fixture.clients[customerIndex],
+    customerPhone: "+256 4" + (14000000 + customerIndex * 222222),
+    customerEmail: `accounts${customerIndex + 1}@example.co.ug`,
     amount: Math.round(fixture.saleSize * (1 + offerIndex * 0.35)),
     status: status as SaleRecord["status"],
     channel: (["Direct", "Bank transfer", "Mobile money", "Direct"] as const)[index % 4],
     owner: fixture.team[customerIndex % fixture.team.length],
+    paymentType: status === "paid" ? "full" : "partial",
+    collectedBy: fixture.team[customerIndex % fixture.team.length],
+    collectedByEmail: `team${customerIndex + 1}@example.co.ug`,
+    agreedValue: Math.round(fixture.saleSize * (1 + offerIndex * 0.35)),
+    balanceAfter: 0,
+    installmentNo: 1,
   }));
 
   const tasks: TaskRecord[] = TASK_PLAN.map(([title, status, priority, related, dueOffset], index) => ({
@@ -329,6 +369,9 @@ export function seedRecords(tenantId: TenantId): TenantRecords {
       spent,
       progress: status === "completed" ? 100 : Math.min(95, Math.round((spent / budget) * 100)),
       dueOn: dateOffset(-(7 + index * 9)),
+      startDate: dateOffset(90 - index * 10),
+      durationWeeks: 6,
+      programSession: index % 2 === 0 ? 'morning' : 'afternoon',
       owner: fixture.team[index % fixture.team.length],
       description: `${fixture.clients[index % fixture.clients.length]} · ${offer}`,
     };

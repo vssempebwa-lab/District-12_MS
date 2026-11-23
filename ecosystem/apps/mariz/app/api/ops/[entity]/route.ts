@@ -1,4 +1,5 @@
 import { handleCreate, handleList } from "@d12/tenant-workspace/server";
+import { sessionFromRequest } from "@d12/auth";
 import type { CustomerRecord } from "@d12/contracts";
 import { TENANT_ID } from "@/lib/tenant";
 import { recordCustomerPayment } from "@/lib/customer-sales";
@@ -32,7 +33,8 @@ export async function POST(
       .catch(() => null)) as { record?: CustomerRecord } | null;
     if (payload?.record) {
       try {
-        await recordCustomerPayment(payload.record);
+        const session = await sessionFromRequest(request);
+        await recordCustomerPayment(payload.record, session ? { name: session.name, email: session.email } : undefined);
       } catch (error) {
         console.error("[mariz] paid customer did not reach sales", error);
       }

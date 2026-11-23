@@ -135,6 +135,10 @@ create table if not exists public.d12_ops_customers (
   owner text,
   lifetime_value numeric(16, 2) not null default 0,
   last_order date,
+  paid_total numeric(16, 2) not null default 0,
+  last_payment_on date,
+  last_payment_by text not null default '',
+  last_payment_by_email text not null default '',
   created_at timestamptz not null default now(),
   updated_at timestamptz not null default now()
 );
@@ -147,9 +151,18 @@ create table if not exists public.d12_ops_sales (
   description text not null,
   customer_id text,
   customer_name text,
+  customer_phone text not null default '',
+  customer_email text not null default '',
   amount numeric(16, 2) not null default 0,
   status text not null default 'pending' check (status in ('paid', 'pending', 'refunded')),
   channel text,
+  owner text not null default '',
+  payment_type text not null default 'full' check (payment_type in ('full', 'partial')),
+  collected_by text not null default '',
+  collected_by_email text not null default '',
+  agreed_value numeric(16, 2) not null default 0,
+  balance_after numeric(16, 2) not null default 0,
+  installment_no integer not null default 0,
   created_at timestamptz not null default now(),
   updated_at timestamptz not null default now()
 );

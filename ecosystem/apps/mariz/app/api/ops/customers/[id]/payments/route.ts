@@ -18,6 +18,7 @@ export async function POST(
       guard.status,
     );
   }
+  const recordedBy = { name: guard.session.name, email: guard.session.email };
 
   const body = (await request.json().catch(() => null)) as
     | { amount?: unknown; paidOn?: unknown }
@@ -36,7 +37,7 @@ export async function POST(
   if (!customer) return jsonError("NOT_FOUND", "That customer no longer exists.", 404);
 
   try {
-    const result = await recordCustomerInstallment(customer, amount, paidOn);
+    const result = await recordCustomerInstallment(customer, amount, paidOn, recordedBy);
     const updated = result.settled
       ? ((await listEntity(TENANT_ID, "customers")) as CustomerRecord[]).find(
           (record) => record.id === customer.id,
