@@ -67,7 +67,6 @@ export const leadInputSchema = z.object({
 export const customerInputSchema = z.object({
   name: z.string().trim().min(1, "Name is required").max(120),
   company: shortText(120),
-  address: shortText(160),
   email: emailOrBlank,
   phone: shortText(40),
   tier: z.enum(CUSTOMER_TIERS).default("standard"),

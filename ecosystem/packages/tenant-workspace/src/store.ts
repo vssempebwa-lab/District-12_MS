@@ -100,3 +100,9 @@ export function demoClearOutbox(tenantId: TenantId, ids: Set<string>): void {
   const store = getTenantStore(tenantId);
   store.outbox = store.outbox.filter((row) => !ids.has(row.id));
 }
+
+/** Drop the in-memory demo store so the next read reseeds from fixtures. */
+export function demoReset(tenantId: TenantId): void {
+  const stores = globalStores.__d12TenantStores;
+  if (stores) delete stores[tenantId];
+}

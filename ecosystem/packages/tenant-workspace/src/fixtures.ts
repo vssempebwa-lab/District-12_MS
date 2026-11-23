@@ -252,6 +252,39 @@ const STAFF_PLAN: Array<[string, string, StaffRecord["status"]]> = [
   ["Associate", "Delivery", "on_leave"],
 ];
 
+const TALENT_CLINICS = [
+  "Computer Skills",
+  "Front Office Operations",
+  "Graphic Design",
+  "Photography",
+  "Telesales",
+  "Affiliate Marketing",
+] as const;
+
+const TALENT_SESSIONS = [
+  "Morning Session (8:30 AM - 11:30 AM)",
+  "Afternoon Session (2:00 PM - 5:00 PM)",
+  "Weekend Intensive",
+] as const;
+
+type TalentParticipant = [string, string, string, number, "paid" | "active" | "dormant", string];
+
+const TALENT_COHORTS = [
+  { code: "MTC-01", name: "Nov/Dec 2026 Intake", startOffset: -14, fee: 20_000, status: "active" as const },
+  { code: "MTC-02", name: "Jan/Feb 2027 Intake", startOffset: 10, fee: 20_000, status: "planned" as const },
+];
+
+const TALENT_PARTICIPANTS: TalentParticipant[] = [
+  ["Nakato Aisha", "Kampala Central", "0771000101", 20_000, "paid", "Computer Skills"],
+  ["Mugisha Daniel", "Nakasero", "0771000102", 0, "active", "Front Office Operations"],
+  ["Nansubuga Sandra", "Makindye", "0771000103", 10_000, "active", "Graphic Design"],
+  ["Kirabo Tom", "Kawempe", "0771000104", 0, "dormant", "Photography"],
+  ["Atuhaire Racheal", "Rubaga", "0771000105", 0, "active", "Telesales"],
+  ["Owori Isaac", "Ntinda", "0771000106", 20_000, "paid", "Affiliate Marketing"],
+  ["Kabaseke Joan", "Bweyogerere", "0771000107", 5_000, "active", "Computer Skills"],
+  ["Ssemwanga Brian", "Kira", "0771000108", 0, "active", "Graphic Design"],
+];
+
 export function seedRecords(tenantId: TenantId): TenantRecords {
   const fixture = FIXTURES[tenantId];
   const meta = TENANTS[tenantId];
@@ -274,40 +307,75 @@ export function seedRecords(tenantId: TenantId): TenantRecords {
     description: `${name} is exploring ${fixture.offers[index % fixture.offers.length]} through ${source.toLowerCase()}. Worker: ${fixture.team[index % fixture.team.length]}.`,
   }));
 
-  const customers: CustomerRecord[] = fixture.clients.map((client, index) => ({
-    id: `cust_${tenantId}_${index + 1}`,
-    tenantId,
-    createdAt: dateOffset(120 - index * 9),
-    updatedAt: dateOffset(10 - index),
-    name: client,
-    company: client,
-    address: "",
-    email: `accounts${index + 1}@example.co.ug`,
-    phone: "+256 4" + (14000000 + index * 222222),
-    tier: (["key", "growth", "standard", "growth", "standard"] as const)[index % 5],
-    status: index === 4 ? "dormant" : "active",
-    owner: fixture.team[index % fixture.team.length],
-    lifetimeValue: Math.round(fixture.saleSize * (6 + index * 1.5)),
-    lastOrder: dateOffset(4 + index * 3),
-    issueOn: dateOffset(60 - index * 7),
-    paidTotal: 0,
-    lastPaymentOn: "",
-    lastPaymentBy: "",
-    lastPaymentByEmail: "",
-    registrationNumber: "",
-    clinic: "digital",
-    programSession: "morning",
-    cohort: "",
-    startDate: dateOffset(60 - index * 7),
-    services: [
-      {
-        service: ["recruitment", "call_support", "consultancy", "software_development", "digital_marketing"][
-          index % 5
-        ],
-        amount: Math.round(fixture.saleSize * (2 + index * 0.4)),
-      },
-    ],
-  }));
+  const customers: CustomerRecord[] =
+    tenantId === "talent-clinic"
+      ? TALENT_PARTICIPANTS.map(([name, address, phone, paidTotal, status, clinic], index) => {
+          const cohort = TALENT_COHORTS[index < 5 ? 0 : 1];
+          const fee = cohort.fee;
+          const waived = status === "dormant";
+          const countInCohort = TALENT_PARTICIPANTS.slice(0, index).filter(
+            (_, i) => (i < 5 ? 0 : 1) === (index < 5 ? 0 : 1),
+          ).length;
+          return {
+            id: `cust_${tenantId}_${index + 1}`,
+            tenantId,
+            createdAt: dateOffset(40 - index * 3),
+            updatedAt: dateOffset(index),
+            name,
+            company: address,
+            email: `${name.split(" ")[0].toLowerCase()}@example.co.ug`,
+            phone: `+256 ${phone}`,
+            tier: "standard" as const,
+            status,
+            owner: fixture.team[index % fixture.team.length],
+            lifetimeValue: waived ? 0 : fee,
+            lastOrder: "",
+            issueOn: dateOffset(-cohort.startOffset),
+            paidTotal: waived ? 0 : paidTotal,
+            lastPaymentOn: paidTotal > 0 ? dateOffset(index + 1) : "",
+            lastPaymentBy: paidTotal > 0 ? owner : "",
+            lastPaymentByEmail: paidTotal > 0 ? `${owner.toLowerCase().replace(/\s+/g, ".")}@district12.co.ug` : "",
+            registrationNumber: `${cohort.code}-${String(countInCohort + 1).padStart(3, "0")}`,
+            clinic,
+            programSession: TALENT_SESSIONS[index % TALENT_SESSIONS.length],
+            cohort: cohort.name,
+            startDate: dateOffset(-cohort.startOffset),
+            services: [],
+          };
+        })
+      : fixture.clients.map((client, index) => ({
+          id: `cust_${tenantId}_${index + 1}`,
+          tenantId,
+          createdAt: dateOffset(120 - index * 9),
+          updatedAt: dateOffset(10 - index),
+          name: client,
+          company: client,
+          email: `accounts${index + 1}@example.co.ug`,
+          phone: "+256 4" + (14000000 + index * 222222),
+          tier: (["key", "growth", "standard", "growth", "standard"] as const)[index % 5],
+          status: index === 4 ? "dormant" : "active",
+          owner: fixture.team[index % fixture.team.length],
+          lifetimeValue: Math.round(fixture.saleSize * (6 + index * 1.5)),
+          lastOrder: dateOffset(4 + index * 3),
+          issueOn: dateOffset(60 - index * 7),
+          paidTotal: 0,
+          lastPaymentOn: "",
+          lastPaymentBy: "",
+          lastPaymentByEmail: "",
+          registrationNumber: "",
+          clinic: "digital",
+          programSession: "morning",
+          cohort: "",
+          startDate: dateOffset(60 - index * 7),
+          services: [
+            {
+              service: ["recruitment", "call_support", "consultancy", "software_development", "digital_marketing"][
+                index % 5
+              ],
+              amount: Math.round(fixture.saleSize * (2 + index * 0.4)),
+            },
+          ],
+        }));
 
   const sales: SaleRecord[] = SALE_PLAN.map(([offerIndex, customerIndex, status, daysAgo], index) => ({
     id: `sale_${tenantId}_${index + 1}`,
@@ -354,29 +422,49 @@ export function seedRecords(tenantId: TenantId): TenantRecords {
     "completed",
     "planned",
   ];
-  const projects: ProjectRecord[] = fixture.offers.slice(0, 5).map((offer, index) => {
-    const status = projectStatuses[index] ?? "active";
-    const budget = Math.round(fixture.saleSize * (2 + index * 0.8));
-    const spent = Math.round(budget * (0.15 + index * 0.12));
-    return {
-      id: `proj_${tenantId}_${index + 1}`,
-      tenantId,
-      createdAt: dateOffset(90 - index * 10),
-      updatedAt: isoOffset(Math.max(0, 6 - index), 14),
-      name: offer,
-      client: fixture.clients[index % fixture.clients.length],
-      status,
-      budget,
-      spent,
-      progress: status === "completed" ? 100 : Math.min(95, Math.round((spent / budget) * 100)),
-      dueOn: dateOffset(-(7 + index * 9)),
-      startDate: dateOffset(90 - index * 10),
-      durationWeeks: 6,
-      programSession: index % 2 === 0 ? 'morning' : 'afternoon',
-      owner: fixture.team[index % fixture.team.length],
-      description: `${fixture.clients[index % fixture.clients.length]} · ${offer}`,
-    };
-  });
+  const projects: ProjectRecord[] =
+    tenantId === "talent-clinic"
+      ? TALENT_COHORTS.map((cohort, index) => ({
+          id: `proj_${tenantId}_${index + 1}`,
+          tenantId,
+          createdAt: dateOffset(60 - index * 10),
+          updatedAt: isoOffset(Math.max(0, 3 - index), 14),
+          name: cohort.name,
+          client: cohort.code,
+          status: cohort.status,
+          budget: cohort.fee,
+          spent: 0,
+          progress: 0,
+          dueOn: "",
+          startDate: dateOffset(-cohort.startOffset),
+          durationWeeks: 6,
+          programSession: "",
+          owner: fixture.team[0] ?? owner,
+          description: `${cohort.code} · ${cohort.name} · 6 weeks / 42 days`,
+        }))
+      : fixture.offers.slice(0, 5).map((offer, index) => {
+          const status = projectStatuses[index] ?? "active";
+          const budget = Math.round(fixture.saleSize * (2 + index * 0.8));
+          const spent = Math.round(budget * (0.15 + index * 0.12));
+          return {
+            id: `proj_${tenantId}_${index + 1}`,
+            tenantId,
+            createdAt: dateOffset(90 - index * 10),
+            updatedAt: isoOffset(Math.max(0, 6 - index), 14),
+            name: offer,
+            client: fixture.clients[index % fixture.clients.length],
+            status,
+            budget,
+            spent,
+            progress: status === "completed" ? 100 : Math.min(95, Math.round((spent / budget) * 100)),
+            dueOn: dateOffset(-(7 + index * 9)),
+            startDate: dateOffset(90 - index * 10),
+            durationWeeks: 6,
+            programSession: index % 2 === 0 ? 'morning' : 'afternoon',
+            owner: fixture.team[index % fixture.team.length],
+            description: `${fixture.clients[index % fixture.clients.length]} · ${offer}`,
+          };
+        });
 
   const inventoryCategories = ["Stock", "Supplies", "Equipment", "Consumables"];
   const quantities = [24, 6, 0, 18];

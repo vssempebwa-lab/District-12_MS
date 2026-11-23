@@ -38,12 +38,7 @@ export async function POST(
 
   try {
     const result = await recordCustomerInstallment(customer, amount, paidOn, recordedBy);
-    const updated = result.settled
-      ? ((await listEntity(TENANT_ID, "customers")) as CustomerRecord[]).find(
-          (record) => record.id === customer.id,
-        ) ?? customer
-      : customer;
-    return jsonOk({ sale: result.sale, settled: result.settled, customer: updated }, 201);
+    return jsonOk({ sale: result.sale, settled: result.settled, customer: result.customer }, 201);
   } catch (error) {
     return jsonError(
       "VALIDATION_FAILED",

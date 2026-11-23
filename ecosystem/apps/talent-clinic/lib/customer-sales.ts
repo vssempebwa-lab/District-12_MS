@@ -79,7 +79,10 @@ export async function recordCustomerPayment(
 ): Promise<void> {
   const agreed = agreedCustomerValue(customer);
   if (agreed <= 0) return;
-  const paid = await paidCustomerTotal(customer.id);
+  const paid = Math.max(
+    Math.round(Number(customer.paidTotal ?? 0) * 100) / 100,
+    await paidCustomerTotal(customer.id),
+  );
   const remainder = Math.round((agreed - paid) * 100) / 100;
   if (remainder <= 0) return;
 
@@ -104,6 +107,7 @@ export async function recordCustomerPayment(
 export interface InstallmentResult {
   sale: SaleRecord;
   settled: boolean;
+  customer: CustomerRecord;
 }
 
 /** Books a partial payment; once the agreed value is reached the customer is marked paid. */
@@ -117,7 +121,12 @@ export async function recordCustomerInstallment(
   if (agreed <= 0) {
     throw new Error("This customer has no agreed value to pay against.");
   }
-  const paid = await paidCustomerTotal(customer.id);
+  // Sales are the ledger, but seeded/imported participants can carry a paid
+  // total without a matching sale yet. Use whichever baseline is larger.
+  const paid = Math.max(
+    Math.round(Number(customer.paidTotal ?? 0) * 100) / 100,
+    await paidCustomerTotal(customer.id),
+  );
   const remainder = Math.round((agreed - paid) * 100) / 100;
   if (remainder <= 0) {
     throw new Error("This customer is already fully paid.");
@@ -139,12 +148,12 @@ export async function recordCustomerInstallment(
     paid,
   );
   const newPaidTotal = Math.round((paid + saleAmount) * 100) / 100;
-  await updateEntity(TENANT_ID, "customers", customer.id, {
+  const updated = (await updateEntity(TENANT_ID, "customers", customer.id, {
     paidTotal: newPaidTotal,
     lastPaymentOn: paidOn,
     lastPaymentBy: recordedBy?.name ?? customer.owner ?? "",
     lastPaymentByEmail: recordedBy?.email ?? "",
     ...(settled && customer.status !== "paid" ? { status: "paid" } : {}),
-  });
-  return { sale, settled };
+  })) as CustomerRecord | null;
+  return { sale, settled, customer: updated ?? customer };
 }

@@ -130,6 +130,8 @@ const DATE_KEYS = new Set([
   "callOn",
   "followUpOn",
   "joinedOn",
+  "startDate",
+  "lastPaymentOn",
 ]);
 
 function draftToRow(draft: Record<string, unknown>): Record<string, unknown> {
