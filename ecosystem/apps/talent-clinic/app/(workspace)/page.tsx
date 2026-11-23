@@ -6,5 +6,5 @@ export const dynamic = "force-dynamic";
 
 export default async function OverviewPage() {
   await requireTenantPage(TENANT_ID);
-  redirect("/dashboard/");
+  redirect("/dashboard/index.html");
 }
