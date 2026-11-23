@@ -281,6 +281,7 @@ export function seedRecords(tenantId: TenantId): TenantRecords {
     updatedAt: dateOffset(10 - index),
     name: client,
     company: client,
+    address: "",
     email: `accounts${index + 1}@example.co.ug`,
     phone: "+256 4" + (14000000 + index * 222222),
     tier: (["key", "growth", "standard", "growth", "standard"] as const)[index % 5],

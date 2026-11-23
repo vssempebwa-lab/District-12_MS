@@ -1,20 +1,22 @@
-import { WorkspaceDashboard, getWorkspaceOverview } from "@d12/tenant-workspace/server";
-import { personalWorkName, requireTenantPage } from "@d12/tenant-workspace/server";
-import { TENANT, TENANT_ID } from "@/lib/tenant";
+import { requireTenantPage } from "@d12/tenant-workspace/server";
+import { listEntity } from "@d12/tenant-workspace/server";
+import type { CustomerRecord, ProjectRecord } from "@d12/contracts";
+import { TENANT_ID } from "@/lib/tenant";
+import CohortDashboard from "./cohort-dashboard";
 
 export const dynamic = "force-dynamic";
 
 export default async function OverviewPage() {
-  const session = await requireTenantPage(TENANT_ID);
-  const overview = await getWorkspaceOverview(TENANT_ID);
-
+  await requireTenantPage(TENANT_ID);
+  const [projectRows, customerRows] = await Promise.all([
+    listEntity(TENANT_ID, "projects"),
+    listEntity(TENANT_ID, "customers"),
+  ]);
   return (
-    <WorkspaceDashboard
-      tenant={TENANT}
-      userName={session.name}
-      overview={overview}
-      permissions={session.permissions}
-      personal={personalWorkName(session) !== null}
+    <CohortDashboard
+      initialCohorts={projectRows as ProjectRecord[]}
+      initialParticipants={customerRows as CustomerRecord[]}
+      tenantId={TENANT_ID}
     />
   );
 }
