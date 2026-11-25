@@ -96,7 +96,7 @@ export default async function FinancePage() {
         </ul>
       </Card>
 
-      <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+      <div className="grid grid-cols-2 gap-3 xl:grid-cols-4">
         <StatCard label="Paid revenue · 30 days" value={formatUgx(revenue)} hint={`${formatNumber(paidSales)} paid sales`} icon={<TrendingUp className="h-4 w-4" />} accent="blue" />
         <StatCard label="Operating expenses · 30 days" value={warehouse.expensesAvailable ? formatUgx(expenses) : "—"} hint="Recorded expense transactions" icon={<Wallet className="h-4 w-4" />} accent="violet" />
         <StatCard label="Operating net · 30 days" value={warehouse.expensesAvailable ? formatUgx(net) : "—"} hint="Paid revenue less expenses" icon={<Wallet className="h-4 w-4" />} accent="green" />

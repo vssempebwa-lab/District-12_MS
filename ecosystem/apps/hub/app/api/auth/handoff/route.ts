@@ -7,7 +7,7 @@ import {
   sessionFromRequest,
   tenantCallbackUrl,
 } from "@d12/auth";
-import { hubAppUrl, isTenantId } from "@d12/contracts";
+import { configuredTenantAppUrl, hubAppUrl, isTenantId } from "@d12/contracts";
 import { jsonError } from "@/lib/http";
 
 export async function GET(request: Request): Promise<NextResponse> {
@@ -25,8 +25,15 @@ export async function GET(request: Request): Promise<NextResponse> {
     loginUrl.searchParams.set("next", `${url.pathname}${url.search}`);
     return NextResponse.redirect(loginUrl);
   }
+  if (session.mustChangePassword) {
+    return NextResponse.redirect(new URL("/account/password", hubAppUrl()));
+  }
   if (!canAccessTenant(session, tenant)) {
     return jsonError("FORBIDDEN", "You do not have access to this subsidiary", 403);
+  }
+
+  if (!configuredTenantAppUrl(tenant)) {
+    return NextResponse.redirect(new URL("/dashboard", hubAppUrl()), 303);
   }
 
   const token = await createSessionToken(claimsToUser(session));

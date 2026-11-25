@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { ArrowRight, ChevronDown, Eye, EyeOff, Loader2, ShieldCheck } from "lucide-react";
 import { Alert } from "@d12/ui";
+import { TwoFactorStep } from "@/components/two-factor-step";
 
 const labelClass = "block text-[13px] font-medium text-ink-soft";
 const inputClass =
@@ -19,6 +20,7 @@ export function LoginForm({ next, demo }: { next: string; demo?: DemoDirectory |
   const [showPassword, setShowPassword] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [pending, setPending] = useState(false);
+  const [challenge, setChallenge] = useState<{ email: string; resendAfter: number } | null>(null);
 
   async function submit(event: React.FormEvent<HTMLFormElement>): Promise<void> {
     event.preventDefault();
@@ -31,8 +33,19 @@ export function LoginForm({ next, demo }: { next: string; demo?: DemoDirectory |
         body: JSON.stringify({ email, password, next }),
       });
       const body = (await response.json().catch(() => null)) as
-        | { ok?: boolean; redirect?: string; error?: { message?: string } }
+        | {
+            ok?: boolean;
+            redirect?: string;
+            twoFactor?: boolean;
+            email?: string;
+            resendAfter?: number;
+            error?: { message?: string };
+          }
         | null;
+      if (response.ok && body?.twoFactor) {
+        setChallenge({ email: body.email ?? email, resendAfter: body.resendAfter ?? 30 });
+        return;
+      }
       if (!response.ok || !body?.redirect) {
         setError(body?.error?.message ?? "Could not sign in. Try again.");
         return;
@@ -43,6 +56,20 @@ export function LoginForm({ next, demo }: { next: string; demo?: DemoDirectory |
     } finally {
       setPending(false);
     }
+  }
+
+  if (challenge) {
+    return (
+      <TwoFactorStep
+        email={challenge.email}
+        resendAfter={challenge.resendAfter}
+        onRestart={(message) => {
+          setChallenge(null);
+          setPassword(demo?.password ?? "");
+          setError(message ?? null);
+        }}
+      />
+    );
   }
 
   return (

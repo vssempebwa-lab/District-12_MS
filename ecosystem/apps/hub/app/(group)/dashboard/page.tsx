@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { Activity, ArrowRight, ArrowUpRight, Building2, Clock3, UsersRound, Wallet } from "lucide-react";
-import { TENANTS, TENANT_IDS, type TenantId } from "@d12/contracts";
+import { configuredTenantAppUrl, TENANTS, TENANT_IDS, type TenantId } from "@d12/contracts";
 import {
   Badge,
   BrandMark,
@@ -76,7 +76,7 @@ export default async function DashboardPage({
         }
       />
 
-      <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+      <div className="grid grid-cols-2 gap-3 xl:grid-cols-4">
         <StatCard
           label="Subsidiaries"
           value={warehouse.tenants.length}
@@ -137,10 +137,13 @@ export default async function DashboardPage({
             <tbody>
               {warehouse.tenants.map((tenant) => {
                 const meta = TENANTS[tenant.tenantId];
+                const openHref = configuredTenantAppUrl(tenant.tenantId)
+                  ? `/api/auth/handoff?tenant=${tenant.tenantId}`
+                  : undefined;
                 return (
                   <RowLink
                     key={tenant.tenantId}
-                    href={`/api/auth/handoff?tenant=${tenant.tenantId}`}
+                    href={openHref}
                     className={rowClass}
                   >
                     <Td>
@@ -166,14 +169,16 @@ export default async function DashboardPage({
                       {relativeTime(tenant.lastEventAt)}
                     </Td>
                     <Td className="text-right">
-                      <a
-                        href={`/api/auth/handoff?tenant=${tenant.tenantId}`}
-                        aria-label={`Open ${meta.shortName} workspace`}
-                        className="inline-flex items-center gap-1 rounded-md px-2 py-1 text-xs font-semibold text-navy hover:bg-canvas"
-                      >
-                        Open
-                        <ArrowUpRight className="h-3.5 w-3.5" />
-                      </a>
+                      {openHref ? (
+                        <a
+                          href={openHref}
+                          aria-label={`Open ${meta.shortName} workspace`}
+                          className="inline-flex items-center gap-1 rounded-md px-2 py-1 text-xs font-semibold text-navy hover:bg-canvas"
+                        >
+                          Open
+                          <ArrowUpRight className="h-3.5 w-3.5" />
+                        </a>
+                      ) : null}
                     </Td>
                   </RowLink>
                 );

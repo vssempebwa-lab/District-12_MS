@@ -125,8 +125,21 @@ export function tenantMeta(id: string): TenantMeta | undefined {
   return isTenantId(id) ? TENANTS[id] : undefined;
 }
 
+export function configuredTenantAppUrl(id: TenantId): string | undefined {
+  const value = APP_URLS[id]?.trim();
+  if (!value) return undefined;
+  try {
+    const url = new URL(value);
+    if (url.protocol !== "https:") return undefined;
+    if (url.hostname === "localhost" || url.hostname === "127.0.0.1") return undefined;
+    return url.origin;
+  } catch {
+    return undefined;
+  }
+}
+
 export function tenantAppUrl(id: TenantId): string {
-  return APP_URLS[id] ?? `http://localhost:${TENANTS[id].port}`;
+  return configuredTenantAppUrl(id) ?? `http://localhost:${TENANTS[id].port}`;
 }
 
 export function hubAppUrl(): string {

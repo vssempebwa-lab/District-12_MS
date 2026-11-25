@@ -22,6 +22,7 @@ export interface SessionUser {
   roles: RoleId[];
   tenants: TenantId[];
   homeTenant: TenantId | null;
+  mustChangePassword?: boolean;
 }
 
 export interface SessionClaims extends JwtPayload {
@@ -33,6 +34,7 @@ export interface SessionClaims extends JwtPayload {
   permissions: string[];
   tenants: TenantId[];
   homeTenant: TenantId | null;
+  mustChangePassword: boolean;
   iss: string;
 }
 
@@ -74,6 +76,7 @@ export function buildClaims(user: SessionUser, ttlSeconds: number = getSessionTt
     permissions: permissionsForRoles(user.roles),
     tenants,
     homeTenant: user.homeTenant,
+    mustChangePassword: user.mustChangePassword === true,
     iss: SESSION_ISSUER,
     iat: now,
     exp: now + ttlSeconds,
@@ -90,7 +93,7 @@ export async function createSessionToken(
 export async function readSessionToken(token: string): Promise<SessionClaims | null> {
   const claims = await verifyJwt<SessionClaims>(token, getSessionSecret());
   if (!claims || claims.iss !== SESSION_ISSUER || !Array.isArray(claims.tenants)) return null;
-  return claims;
+  return { ...claims, mustChangePassword: claims.mustChangePassword === true };
 }
 
 export function canAccessTenant(session: SessionClaims | null, tenant: TenantId): boolean {
@@ -152,6 +155,7 @@ export function claimsToUser(session: SessionClaims): SessionUser {
     roles: session.roles,
     tenants: session.tenants,
     homeTenant: session.homeTenant,
+    mustChangePassword: session.mustChangePassword === true,
   };
 }
 

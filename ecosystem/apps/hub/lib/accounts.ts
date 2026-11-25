@@ -22,6 +22,7 @@ import {
   type TenantId,
 } from "@d12/contracts";
 import { newId } from "@d12/telemetry";
+import { sendCredentialEmail, type MailResult } from "./mail";
 import { getStore, pushAudit, todayIso } from "./store";
 
 export class AccountError extends Error {
@@ -50,9 +51,43 @@ function passwordMatches(password: string, stored: string): boolean {
   return actual.length === expected.length && timingSafeEqual(actual, expected);
 }
 
+const TEMPORARY_ALPHABET = "ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz23456789";
+
+export function generateTemporaryPassword(): string {
+  const bytes = randomBytes(16);
+  let password = "";
+  for (const byte of bytes) password += TEMPORARY_ALPHABET[byte % TEMPORARY_ALPHABET.length];
+  return password;
+}
+
 function authEmailTaken(error: { code?: string; message?: string }): boolean {
   const message = (error.message ?? "").toLowerCase();
   return error.code === "email_exists" || message.includes("already been registered");
+}
+
+function accountErrorFrom(error: unknown): AccountError {
+  if (error instanceof AccountError) return error;
+  const code = (error as { code?: string } | null)?.code;
+  const message = (error as { message?: string } | null)?.message ?? "";
+  if (code === "23505") return new AccountError(409, "CONFLICT", "An account with that email already exists");
+  if (code === "23503" && /tenant_id/i.test(message)) {
+    return new AccountError(409, "CONFLICT", "That subsidiary is not available for sign-in accounts yet");
+  }
+  if (code === "23503") return new AccountError(409, "CONFLICT", "That role or subsidiary could not be saved");
+  console.error("[d12] account write failed", error);
+  return new AccountError(500, "INTERNAL", "Could not save the sign-in account");
+}
+
+async function discardSignIn(authId: string | null, userId?: string): Promise<void> {
+  const service = createServiceClient();
+  if (userId) {
+    await service.from("d12_iam_users").delete().eq("id", userId);
+  }
+  if (authId) {
+    await service.auth.admin.deleteUser(authId).catch((cleanup) => {
+      console.error("[d12] auth cleanup failed", cleanup);
+    });
+  }
 }
 
 interface GrantRow {
@@ -239,10 +274,24 @@ async function ensureProvisioningAuthority(actorId: string, requestedRole: RoleI
   }
 }
 
+export interface AccountSaveResult {
+  account: AccountView;
+  mail: MailResult;
+}
+
+async function emailCredentials(account: AccountView, password: string): Promise<MailResult> {
+  return sendCredentialEmail({
+    name: account.name,
+    email: account.email,
+    password,
+    tenants: account.tenants,
+  });
+}
+
 export async function createAccount(
   payload: AccountCreatePayload,
   actor: string,
-): Promise<AccountView> {
+): Promise<AccountSaveResult> {
   const role = ensureRole(payload.role);
   await ensureProvisioningAuthority(actor, role);
   const tenants = resolveTenants(role, payload.tenants);
@@ -256,9 +305,10 @@ export async function createAccount(
         throw new AccountError(409, "CONFLICT", "An account with that email already exists");
       }
       const service = createServiceClient();
+      const password = generateTemporaryPassword();
       const { data: auth, error: authError } = await service.auth.admin.createUser({
         email,
-        password: payload.password,
+        password,
         email_confirm: true,
         user_metadata: { name },
       });
@@ -278,28 +328,26 @@ export async function createAccount(
           email,
           status: payload.status,
           created_at: todayIso(),
+          must_change_password: true,
         });
-        if (error) {
-          if (error.code === "23505") {
-            throw new AccountError(409, "CONFLICT", "An account with that email already exists");
-          }
-          throw error;
-        }
+        if (error) throw error;
         await replaceGrants(id, role, tenants, actor);
         await writeAudit("account.created", actor, id, tenants[0] ?? null, `${name} · ${role}`);
 
         const { accounts } = await listAccounts();
         const created = accounts.find((account) => account.id === id);
         if (!created) throw new AccountError(500, "INTERNAL", "Account was created but could not be read");
-        return created;
+        const mail = await emailCredentials(created, password);
+        if (mail.sent) {
+          await writeAudit("account.credentials_sent", actor, id, tenants[0] ?? null, name);
+        }
+        return { account: created, mail };
       } catch (error) {
-        await service.auth.admin.deleteUser(authId).catch((cleanup) => {
-          console.error("[d12] auth cleanup failed", cleanup);
-        });
+        await discardSignIn(authId, id);
         throw error;
       }
     } catch (error) {
-      if (!isFallbackError(error)) throw error;
+      throw accountErrorFrom(error);
     }
   }
 
@@ -318,8 +366,11 @@ export async function createAccount(
     createdAt: todayIso(),
     lastActive: null,
   };
+  const password = generateTemporaryPassword();
   store.accounts.push(account);
-  store.passwordHashes[account.id] = hashPassword(payload.password);
+  store.passwordHashes[account.id] = hashPassword(password);
+  store.mustChangePassword ??= {};
+  store.mustChangePassword[account.id] = true;
   pushAudit({
     action: "account.created",
     actor,
@@ -327,7 +378,13 @@ export async function createAccount(
     tenantId: tenants[0] ?? null,
     detail: `${name} · ${role}`,
   });
-  return account;
+  return {
+    account,
+    mail: {
+      sent: false,
+      detail: "The account was saved. Email is sent when the directory service is configured.",
+    },
+  };
 }
 
 export async function updateAccount(
@@ -354,10 +411,10 @@ export async function updateAccount(
       const service = createServiceClient();
       const authId = await authIdFor(id);
       const emailChanged = email !== current.email;
-      if (authId && (emailChanged || payload.password)) {
+      if (authId && emailChanged) {
         const { error: authError } = await service.auth.admin.updateUserById(authId, {
-          ...(emailChanged ? { email, email_confirm: true } : {}),
-          ...(payload.password ? { password: payload.password } : {}),
+          email,
+          email_confirm: true,
         });
         if (authError) {
           if (authEmailTaken(authError)) {
@@ -368,7 +425,7 @@ export async function updateAccount(
       }
       const { error } = await service
         .from("d12_iam_users")
-        .update({ name, email, status })
+        .update({ name, email, status, ...(authId ? { auth_id: authId } : {}) })
         .eq("id", id);
       if (error) {
         if (authId && emailChanged) {
@@ -376,21 +433,15 @@ export async function updateAccount(
             .updateUserById(authId, { email: current.email, email_confirm: true })
             .catch((revert) => console.error("[d12] auth email revert failed", revert));
         }
-        if (error.code === "23505") {
-          throw new AccountError(409, "CONFLICT", "An account with that email already exists");
-        }
         throw error;
       }
       await replaceGrants(id, role, tenants, actor);
       await writeAudit("account.updated", actor, id, tenants[0] ?? null, `${name} · ${role}`);
-      if (payload.password) {
-        await writeAudit("account.password_set", actor, id, tenants[0] ?? null, name);
-      }
 
       const { accounts } = await listAccounts();
       return accounts.find((account) => account.id === id) ?? { ...current, role, tenants };
     } catch (error) {
-      if (!isFallbackError(error)) throw error;
+      throw accountErrorFrom(error);
     }
   }
 
@@ -416,17 +467,75 @@ export async function updateAccount(
     tenantId: tenants[0] ?? null,
     detail: `${name} · ${role}`,
   });
-  if (payload.password) {
-    store.passwordHashes[id] = hashPassword(payload.password);
-    pushAudit({
-      action: "account.password_set",
-      actor,
-      target: id,
-      tenantId: tenants[0] ?? null,
-      detail: name,
-    });
-  }
   return updated;
+}
+
+export async function issueTemporaryPassword(id: string, actor: string): Promise<AccountSaveResult> {
+  const current = await findAccount(id);
+  if (!current) throw new AccountError(404, "NOT_FOUND", "Account not found");
+  await ensureProvisioningAuthority(actor, current.role, current.role);
+  const password = generateTemporaryPassword();
+
+  if (hasServiceRoleEnv()) {
+    try {
+      const service = createServiceClient();
+      let authId = await authIdFor(id);
+      if (!authId) {
+        const { data: created, error: createError } = await service.auth.admin.createUser({
+          email: current.email,
+          password,
+          email_confirm: true,
+          user_metadata: { name: current.name },
+        });
+        const createdUser = created?.user;
+        if (createError || !createdUser) {
+          if (createError && authEmailTaken(createError)) {
+            throw new AccountError(409, "CONFLICT", "An account with that email already exists");
+          }
+          throw createError ?? new AccountError(500, "INTERNAL", "Could not create the sign-in");
+        }
+        authId = createdUser.id;
+      } else {
+        const { error: authError } = await service.auth.admin.updateUserById(authId, { password });
+        if (authError) throw authError;
+      }
+      const { error } = await service
+        .from("d12_iam_users")
+        .update({ auth_id: authId, must_change_password: true })
+        .eq("id", id);
+      if (error) {
+        if (!(await authIdFor(id))) await discardSignIn(authId);
+        throw error;
+      }
+      const mail = await emailCredentials(current, password);
+      await writeAudit(
+        mail.sent ? "account.credentials_sent" : "account.temporary_password_set",
+        actor,
+        id,
+        current.tenants[0] ?? null,
+        current.name,
+      );
+      return { account: current, mail };
+    } catch (error) {
+      throw accountErrorFrom(error);
+    }
+  }
+
+  const store = getStore();
+  store.passwordHashes[id] = hashPassword(password);
+  store.mustChangePassword ??= {};
+  store.mustChangePassword[id] = true;
+  pushAudit({
+    action: "account.temporary_password_set",
+    actor,
+    target: id,
+    tenantId: current.tenants[0] ?? null,
+    detail: current.name,
+  });
+  return {
+    account: current,
+    mail: { sent: false, detail: "The temporary password was saved. Email is sent when the directory service is configured." },
+  };
 }
 
 export async function deleteAccount(id: string, actor: string): Promise<void> {
@@ -451,7 +560,7 @@ export async function deleteAccount(id: string, actor: string): Promise<void> {
       }
       return;
     } catch (error) {
-      if (!isFallbackError(error)) throw error;
+      throw accountErrorFrom(error);
     }
   }
 
@@ -496,6 +605,40 @@ export async function transferAccount(
   return updated;
 }
 
+export async function changeTemporaryPassword(
+  userId: string,
+  email: string,
+  currentPassword: string,
+  newPassword: string,
+): Promise<void> {
+  if (currentPassword === newPassword) {
+    throw new AccountError(400, "VALIDATION_FAILED", "Choose a password that is different from the temporary one.");
+  }
+  if (hasServiceRoleEnv()) {
+    const anon = createAnonClient();
+    const { error: signInError } = await anon.auth.signInWithPassword({ email, password: currentPassword });
+    if (signInError) throw new AccountError(401, "UNAUTHORIZED", "The temporary password is incorrect");
+    const service = createServiceClient();
+    const authId = await authIdFor(userId);
+    if (!authId) throw new AccountError(404, "NOT_FOUND", "This sign-in could not be updated");
+    const { error } = await service.auth.admin.updateUserById(authId, { password: newPassword });
+    if (error) throw new AccountError(500, "INTERNAL", "The new password could not be saved");
+    const { error: flagError } = await service
+      .from("d12_iam_users")
+      .update({ must_change_password: false })
+      .eq("id", userId);
+    if (flagError) throw new AccountError(500, "INTERNAL", "The new password could not be saved");
+    return;
+  }
+  const store = getStore();
+  const stored = store.passwordHashes[userId];
+  if (stored && !passwordMatches(currentPassword, stored)) {
+    throw new AccountError(401, "UNAUTHORIZED", "The temporary password is incorrect");
+  }
+  store.passwordHashes[userId] = hashPassword(newPassword);
+  if (store.mustChangePassword) delete store.mustChangePassword[userId];
+}
+
 export function demoSessionUser(email: string, password = ""): SessionUser | null {
   const store = getStore();
   const account = store.accounts.find(
@@ -511,6 +654,7 @@ export function demoSessionUser(email: string, password = ""): SessionUser | nul
     roles: [account.role],
     tenants: account.tenants,
     homeTenant: isGlobalRole(account.role) ? null : (account.tenants[0] ?? null),
+    mustChangePassword: store.mustChangePassword?.[account.id] === true,
   };
 }
 
@@ -523,11 +667,22 @@ export async function authenticateSupabase(
   if (error || !data.user) return null;
 
   const service = createServiceClient();
-  const { data: row, error: rowError } = await service
+  const withFlag = "id, name, email, status, must_change_password, d12_iam_grants(role_id, tenant_id)";
+  const withoutFlag = "id, name, email, status, d12_iam_grants(role_id, tenant_id)";
+  let { data: row, error: rowError } = await service
     .from("d12_iam_users")
-    .select("id, name, email, status, d12_iam_grants(role_id, tenant_id)")
+    .select(withFlag)
     .eq("auth_id", data.user.id)
     .maybeSingle();
+  if (rowError && /must_change_password/i.test(rowError.message ?? "")) {
+    const retry = await service
+      .from("d12_iam_users")
+      .select(withoutFlag)
+      .eq("auth_id", data.user.id)
+      .maybeSingle();
+    row = retry.data as typeof row;
+    rowError = retry.error;
+  }
   if (rowError) throw rowError;
   if (!row) return null;
 
@@ -548,6 +703,7 @@ export async function authenticateSupabase(
     roles: roles.length ? roles : [primary],
     tenants,
     homeTenant: isGlobalRole(primary) ? null : (tenants[0] ?? null),
+    mustChangePassword: (user as UserRow & { must_change_password?: boolean }).must_change_password === true,
   };
 }
 

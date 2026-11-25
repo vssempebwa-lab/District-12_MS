@@ -20,6 +20,7 @@ export default async function LoginPage({
   searchParams: { [key: string]: string | string[] | undefined };
 }) {
   const session = await getHubSession();
+  if (session?.mustChangePassword) redirect("/account/password");
   if (session) {
     const landing = landingFor(session);
     if (landing.kind === "hub") redirect(landing.path);

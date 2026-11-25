@@ -440,7 +440,6 @@ export const accountCreateSchema = z.object({
   role: z.enum(ROLE_IDS),
   tenants: z.array(z.enum(TENANT_IDS)).default([]),
   status: accountStatusSchema.default("active"),
-  password: accountPasswordSchema,
 });
 
 export const accountUpdateSchema = z
@@ -450,9 +449,21 @@ export const accountUpdateSchema = z
     role: z.enum(ROLE_IDS),
     tenants: z.array(z.enum(TENANT_IDS)),
     status: accountStatusSchema,
-    password: accountPasswordSchema,
   })
   .partial();
+
+export const passwordChangeSchema = z.object({
+  currentPassword: z.string().min(1, "Enter the temporary password").max(200),
+  newPassword: accountPasswordSchema,
+});
+
+export const mailSettingsSchema = z.object({
+  host: z.string().trim().max(253).default(""),
+  port: z.coerce.number().int().min(1).max(65535).default(587),
+  username: z.string().trim().max(320).default(""),
+  password: z.string().max(200).default(""),
+  from: z.union([z.string().trim().email("Enter a valid From address"), z.literal("")]).default(""),
+});
 
 export const accountTransferSchema = z
   .object({

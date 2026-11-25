@@ -477,7 +477,7 @@ export function TeamBoard({ members }: { members: TeamMember[] }) {
         title="Your team"
         description="Everyone with a sign-in to this subsidiary, matched to the staff directory."
       />
-      <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+      <div className="grid grid-cols-2 gap-3 xl:grid-cols-4">
         <StatCard label="Team" value={members.length} hint="People with access" icon={<UsersRound className="h-4 w-4" />} />
         <StatCard label="Active" value={active} hint="Active accounts" icon={<UserRound className="h-4 w-4" />} accent="green" />
         <StatCard label="Roles" value={roles.size} hint="Distinct responsibilities" icon={<ShieldCheck className="h-4 w-4" />} accent="violet" />

@@ -1,0 +1,54 @@
+name: Database backup
+
+# Nightly encrypted pg_dump of the Supabase database to Google Drive, followed
+# by a restore check of the uploaded copy. Setup: ecosystem/docs/backups.md.
+# GitHub emails the repository admins when a scheduled run fails.
+
+on:
+  schedule:
+    - cron: "15 0 * * *" # 03:15 Kampala time
+  workflow_dispatch:
+
+concurrency:
+  group: database-backup
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+
+jobs:
+  backup:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 45
+    env:
+      PG_MAJOR: "17"
+      SUPABASE_DB_URL: ${{ secrets.SUPABASE_DB_URL }}
+      BACKUP_ENCRYPTION_KEY: ${{ secrets.BACKUP_ENCRYPTION_KEY }}
+      GDRIVE_CLIENT_ID: ${{ secrets.GDRIVE_CLIENT_ID }}
+      GDRIVE_CLIENT_SECRET: ${{ secrets.GDRIVE_CLIENT_SECRET }}
+      GDRIVE_REFRESH_TOKEN: ${{ secrets.GDRIVE_REFRESH_TOKEN }}
+      GDRIVE_SERVICE_ACCOUNT_JSON: ${{ secrets.GDRIVE_SERVICE_ACCOUNT_JSON }}
+      GDRIVE_FOLDER_ID: ${{ vars.GDRIVE_FOLDER_ID }}
+      BACKUP_KEEP_DAILY: ${{ vars.BACKUP_KEEP_DAILY || '14' }}
+      BACKUP_KEEP_WEEKLY: ${{ vars.BACKUP_KEEP_WEEKLY || '8' }}
+      BACKUP_KEEP_MONTHLY: ${{ vars.BACKUP_KEEP_MONTHLY || '12' }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - name: Install PostgreSQL client
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y -qq postgresql-common
+          sudo /usr/share/postgresql-common/pgdg/apt.postgresql.org.sh -y
+          sudo apt-get install -y -qq "postgresql-client-${PG_MAJOR}"
+          echo "PG_BIN=/usr/lib/postgresql/${PG_MAJOR}/bin" >> "$GITHUB_ENV"
+
+      - name: Back up to Google Drive
+        run: node ecosystem/scripts/backup-to-drive.mjs backup
+
+      - name: Restore check of the uploaded backup
+        run: node ecosystem/scripts/backup-to-drive.mjs verify-latest

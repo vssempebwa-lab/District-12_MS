@@ -43,7 +43,7 @@ export default async function GroupReportsPage() {
         }
       />
 
-      <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+      <div className="grid grid-cols-2 gap-3 xl:grid-cols-4">
         <StatCard label="Reports" value={reports.length} hint="Visible to your desk" icon={<FileText className="h-4 w-4" />} />
         <StatCard
           label="Awaiting review"

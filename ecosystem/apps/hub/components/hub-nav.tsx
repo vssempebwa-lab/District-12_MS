@@ -26,7 +26,7 @@ import {
   X,
   type LucideIcon,
 } from "lucide-react";
-import { TENANTS, type AccountView, type HubNotification, type TenantId } from "@d12/contracts";
+import { configuredTenantAppUrl, TENANTS, type AccountView, type HubNotification, type TenantId } from "@d12/contracts";
 import { Avatar, cn } from "@d12/ui";
 import { relativeTime } from "@/lib/format";
 
@@ -53,6 +53,8 @@ const ITEMS: NavItem[] = [
   { href: "/notifications", label: "Notifications", short: "Notifications", icon: Bell, available: true, permission: "notifications.read" },
   { href: "/settings", label: "Settings", short: "Settings", icon: Settings, available: true, permission: "group.settings" },
 ];
+
+export const MAIN_ITEMS = ITEMS;
 
 export const HR_ITEMS: NavItem[] = [
   { href: "/hr", label: "Dashboard", short: "Dashboard", icon: LayoutDashboard, available: true, exact: true },
@@ -310,7 +312,11 @@ export function HubTopbar({
               </Link>
             ))}
             {subsidiaries.map((id) => (
-              <a key={id} href={`/api/auth/handoff?tenant=${id}`} className="block rounded-lg px-3 py-2 text-sm text-navy hover:bg-royal-50">{TENANTS[id].shortName}</a>
+              configuredTenantAppUrl(id) ? (
+                <a key={id} href={`/api/auth/handoff?tenant=${id}`} className="block rounded-lg px-3 py-2 text-sm text-navy hover:bg-royal-50">{TENANTS[id].shortName}</a>
+              ) : (
+                <p key={id} className="rounded-lg px-3 py-2 text-sm text-navy">{TENANTS[id].shortName}</p>
+              )
             ))}
             {!pages.length && !subsidiaries.length && !matches.length ? <p className="px-3 py-3 text-sm text-ink-soft">No matches for “{search.trim()}”.</p> : null}
           </div>

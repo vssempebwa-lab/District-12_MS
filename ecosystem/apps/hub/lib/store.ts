@@ -32,6 +32,7 @@ export interface StoredBatch {
 export interface HubStore {
   accounts: AccountView[];
   passwordHashes: Record<string, string>;
+  mustChangePassword: Record<string, true>;
   audit: AuditEntry[];
   batches: StoredBatch[];
   events: Partial<Record<TenantId, TelemetryEvent[]>>;
@@ -59,6 +60,7 @@ function createStore(): HubStore {
   return {
     accounts: DEMO_ACCOUNTS.map(demoAccountView),
     passwordHashes: {},
+    mustChangePassword: {},
     audit: [
       {
         id: "aud_bootstrap",

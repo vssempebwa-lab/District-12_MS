@@ -19,6 +19,10 @@ export async function middleware(request: NextRequest): Promise<NextResponse> {
     return NextResponse.redirect(login);
   }
 
+  if (session.mustChangePassword) {
+    return NextResponse.redirect(new URL("/account/password", hubAppUrl()));
+  }
+
   if (handoff) return NextResponse.redirect(clean);
 
   return NextResponse.next();

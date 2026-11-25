@@ -5,9 +5,8 @@ import {
   ArrowLeftRight,
   Ban,
   CheckCircle2,
-  Eye,
-  EyeOff,
   Info,
+  Mail,
   ShieldCheck,
   Pencil,
   Plus,
@@ -63,7 +62,6 @@ interface EditorState {
   role: RoleId;
   tenants: TenantId[];
   status: AccountStatus;
-  password: string;
 }
 
 const ROLE_STYLE: Record<RoleId, string> = {
@@ -86,7 +84,6 @@ function blankEditor(): EditorState {
     role: "employee",
     tenants: [],
     status: "active",
-    password: "",
   };
 }
 
@@ -99,7 +96,6 @@ function editorFor(account: AccountView): EditorState {
     role: account.role,
     tenants: account.tenants,
     status: account.status,
-    password: "",
   };
 }
 
@@ -136,6 +132,7 @@ export function HrProvisioning({
   const [editor, setEditor] = useState<EditorState | null>(openCreate ? blankEditor() : null);
   const [transfer, setTransfer] = useState<AccountView | null>(null);
   const [confirmDelete, setConfirmDelete] = useState<AccountView | null>(null);
+  const [confirmMail, setConfirmMail] = useState<AccountView | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
@@ -188,7 +185,6 @@ export function HrProvisioning({
         role: state.role,
         tenants: isGlobalRole(state.role) ? [...TENANT_IDS] : state.tenants,
         status: state.status,
-        ...(state.password ? { password: state.password } : {}),
       };
       const response = await fetch(
         state.mode === "create" ? "/api/hr/accounts" : `/api/hr/accounts/${state.accountId}`,
@@ -202,16 +198,18 @@ export function HrProvisioning({
         setError(await readError(response));
         return;
       }
-      const body = (await response.json()) as { account: AccountView };
+      const body = (await response.json()) as { account: AccountView; mail?: { sent?: boolean; detail?: string } };
       upsert(body.account);
       setEditor(null);
-      setNotice(
-        state.mode === "create"
-          ? `${body.account.name} can now sign in as ${body.account.roleLabel}.`
-          : state.password
-            ? `${body.account.name} updated · new password set.`
+      if (state.mode === "create" && body.mail && !body.mail.sent) {
+        setError(`${body.account.name} was saved. ${body.mail.detail ?? "The credentials email did not go out."}`);
+      } else {
+        setNotice(
+          state.mode === "create"
+            ? `${body.account.name} can sign in as ${body.account.roleLabel}. ${body.mail?.detail ?? "Credentials were emailed."}`
             : `${body.account.name} updated.`,
-      );
+        );
+      }
       await refreshAudit();
     } finally {
       setBusy(false);
@@ -234,6 +232,25 @@ export function HrProvisioning({
       const body = (await response.json()) as { account: AccountView };
       upsert(body.account);
       setNotice(`${body.account.name} is now ${body.account.status}.`);
+      await refreshAudit();
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function sendTemporaryPassword(account: AccountView): Promise<void> {
+    setError(null);
+    setBusy(true);
+    try {
+      const response = await fetch(`/api/hr/accounts/${account.id}/temporary-password`, { method: "POST" });
+      const body = (await response.json().catch(() => null)) as { mail?: { sent?: boolean; detail?: string }; error?: { message?: string } } | null;
+      if (!response.ok) {
+        setError(body?.error?.message ?? "Could not send a temporary password");
+        return;
+      }
+      setConfirmMail(null);
+      if (body?.mail?.sent) setNotice(body.mail.detail ?? `Credentials emailed to ${account.email}.`);
+      else setError(body?.mail?.detail ?? `${account.name} has a new temporary password, but the email did not go out.`);
       await refreshAudit();
     } finally {
       setBusy(false);
@@ -429,6 +446,16 @@ export function HrProvisioning({
                           <Pencil className="h-3.5 w-3.5" />
                         </IconAction>
                         <IconAction
+                          label="Email a temporary password"
+                          disabled={busy}
+                          onClick={() => {
+                            setError(null);
+                            setConfirmMail(account);
+                          }}
+                        >
+                          <Mail className="h-3.5 w-3.5" />
+                        </IconAction>
+                        <IconAction
                           label={
                             isSelf
                               ? "You cannot suspend your own account"
@@ -565,6 +592,28 @@ export function HrProvisioning({
       ) : null}
 
       <Modal
+        open={Boolean(confirmMail)}
+        title="Email a temporary password"
+        description="This replaces the current password. The person must choose a new one the next time they sign in."
+        onClose={() => setConfirmMail(null)}
+        footer={
+          <>
+            <Button variant="secondary" onClick={() => setConfirmMail(null)} disabled={busy}>
+              Cancel
+            </Button>
+            <Button disabled={busy} className="bg-royal hover:bg-royal-600" onClick={() => confirmMail && sendTemporaryPassword(confirmMail)}>
+              <Mail className="h-3.5 w-3.5" />
+              Send password
+            </Button>
+          </>
+        }
+      >
+        <p className="text-sm text-ink-soft">
+          Send a new temporary password to <span className="font-semibold text-ink">{confirmMail?.email}</span>?
+        </p>
+      </Modal>
+
+      <Modal
         open={Boolean(confirmDelete)}
         title="Delete account"
         description="This removes the directory account and its subsidiary grants."
@@ -640,11 +689,8 @@ function AccountEditor({
   onSubmit: (state: EditorState) => Promise<void>;
 }) {
   const [draft, setDraft] = useState(state);
-  const [confirmPassword, setConfirmPassword] = useState("");
   const [localError, setLocalError] = useState<string | null>(null);
-  const [showPassword, setShowPassword] = useState(false);
   const global = isGlobalRole(draft.role);
-  const canPeek = true;
 
   function toggleTenant(id: TenantId): void {
     setDraft((current) => ({
@@ -661,20 +707,6 @@ function AccountEditor({
       setLocalError("Name and email are required.");
       return;
     }
-    if (draft.mode === "create" || draft.password) {
-      if (draft.password.length < 8) {
-        setLocalError(
-          draft.mode === "create"
-            ? "Set an initial password of at least 8 characters."
-            : "The new password must be at least 8 characters.",
-        );
-        return;
-      }
-      if (draft.password !== confirmPassword) {
-        setLocalError("The passwords do not match.");
-        return;
-      }
-    }
     if (!global && draft.tenants.length === 0) {
       setLocalError("Select at least one subsidiary for this role.");
       return;
@@ -689,8 +721,8 @@ function AccountEditor({
       title={draft.mode === "create" ? "Provision account" : `Edit ${draft.name}`}
       description={
         draft.mode === "create"
-          ? "Set the password they will sign in with; the role and subsidiaries decide what they can reach."
-          : "Roles and subsidiaries decide where this person lands after sign-in. Set a new password only if you need to change it."
+          ? "A temporary password is emailed to them. They choose their own password the first time they sign in."
+          : "Roles and subsidiaries decide where this person lands after sign-in."
       }
       onClose={onClose}
       footer={
@@ -755,60 +787,11 @@ function AccountEditor({
           </Field>
         </div>
 
-        <div className="grid gap-3 sm:grid-cols-2">
-          <Field label={draft.mode === "create" ? "Initial password" : "New password (optional)"}>
-            <div className="relative">
-              <Input
-                type={showPassword ? "text" : "password"}
-                value={draft.password}
-                onChange={(event) => setDraft({ ...draft, password: event.target.value })}
-                placeholder={draft.mode === "create" ? "At least 8 characters" : "Leave blank to keep current"}
-                autoComplete="new-password"
-                className={canPeek ? "pr-10" : undefined}
-              />
-              {canPeek ? (
-                <button
-                  type="button"
-                  onClick={() => setShowPassword((visible) => !visible)}
-                  aria-label={showPassword ? "Hide password" : "Show password"}
-                  title={showPassword ? "Hide password" : "Show password"}
-                  className="absolute right-1.5 top-1/2 flex h-8 w-8 -translate-y-1/2 items-center justify-center rounded-md text-ink-mute transition-colors hover:bg-canvas hover:text-ink"
-                >
-                  {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
-                </button>
-              ) : null}
-            </div>
-          </Field>
-          <Field label="Confirm password">
-            <div className="relative">
-              <Input
-                type={showPassword ? "text" : "password"}
-                value={confirmPassword}
-                onChange={(event) => setConfirmPassword(event.target.value)}
-                placeholder={draft.mode === "create" ? "Repeat the password" : "Repeat the new password"}
-                autoComplete="new-password"
-                className={canPeek ? "pr-10" : undefined}
-              />
-              {canPeek ? (
-                <button
-                  type="button"
-                  onClick={() => setShowPassword((visible) => !visible)}
-                  aria-label={showPassword ? "Hide password" : "Show password"}
-                  title={showPassword ? "Hide password" : "Show password"}
-                  className="absolute right-1.5 top-1/2 flex h-8 w-8 -translate-y-1/2 items-center justify-center rounded-md text-ink-mute transition-colors hover:bg-canvas hover:text-ink"
-                >
-                  {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
-                </button>
-              ) : null}
-            </div>
-          </Field>
-          <p className="text-[11px] leading-relaxed text-ink-soft sm:col-span-2">
-            {draft.mode === "create"
-              ? `Share this password with ${draft.name.trim() || "the new user"} privately. It unlocks only the role and subsidiaries selected above.`
-              : `Leave blank to keep ${draft.name.trim() || "their"} current password. If you set one, share it with them privately.`}
-            {canPeek ? " Use the eye icon to check it before sharing." : ""}
-          </p>
-        </div>
+        <p className="text-[11px] leading-relaxed text-ink-soft">
+          {draft.mode === "create"
+            ? `A temporary password is emailed to ${draft.email.trim() || "the new address"}. It works only until they choose their own.`
+            : "Use the mail action on the account row to email a new temporary password."}
+        </p>
 
         <div>
           <p className="mb-1 text-[11px] font-semibold uppercase tracking-wide text-ink-soft">
