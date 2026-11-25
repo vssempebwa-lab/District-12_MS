@@ -79,7 +79,7 @@ export const customerInputSchema = z.object({
   // Talent Clinic participant details (optional for other subsidiaries).
   registrationNumber: shortText(40),
   clinic: shortText(40),
-  programSession: shortText(40),
+  programSession: shortText(120),
   cohort: shortText(80),
   startDate: optionalDate,
   // Mariz partial-payment tracking, mirrored on the customer for quick reference.
@@ -160,7 +160,7 @@ export const projectInputSchema = z.object({
   dueOn: optionalDate,
   startDate: optionalDate,
   durationWeeks: z.coerce.number().min(1).max(52).default(6),
-  programSession: shortText(40),
+  programSession: shortText(120),
   owner: shortText(80),
   description: shortText(240),
 });

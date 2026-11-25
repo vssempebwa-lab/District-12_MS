@@ -9,9 +9,26 @@ import { formatNumber, formatUgx, shortDate } from "@d12/tenant-workspace";
 import type { CustomerRecord, ProjectRecord } from "@d12/contracts";
 
 const CLINICS = ["Computer Skills", "Front Office Operations", "Graphic Design", "Photography", "Telesales", "Affiliate Marketing"];
-const SESSIONS = ["Morning Session (8:30 AM - 11:30 AM)", "Afternoon Session (2:00 PM - 5:00 PM)", "Weekend Intensive"];
+const DEFAULT_SESSIONS = [
+  "Morning Session (8:30 AM - 11:30 AM)",
+  "Afternoon Session (2:00 PM - 5:00 PM)",
+  "Weekend Intensive",
+];
 const PAYMENT_STATUSES = ["Free / Waived", "Paid in Full", "Partial Payment", "Pending"] as const;
 type PaymentStatus = (typeof PAYMENT_STATUSES)[number];
+
+function formatSessionLabel(name: string, timeWindow: string): string {
+  const title = name.trim().replace(/\s+/g, " ");
+  const window = timeWindow.trim().replace(/\s+/g, " ");
+  if (!title) return "";
+  if (!window) return title;
+  if (/\(.+\)/.test(title)) return title;
+  return `${title} (${window})`;
+}
+
+function sessionShort(label: string): string {
+  return label.split(" (")[0] || label;
+}
 
 function addDays(date: string, days: number): string {
   if (!date) return "";
@@ -88,11 +105,13 @@ export default function CohortDashboard({ initialCohorts, initialParticipants }:
   const [cohortModal, setCohortModal] = useState(false);
   const [partModal, setPartModal] = useState(false);
   const [payModal, setPayModal] = useState(false);
+  const [sessionModal, setSessionModal] = useState(false);
   const [editCohortId, setEditCohortId] = useState<string | null>(null);
   const [editPartId, setEditPartId] = useState<string | null>(null);
   const [payPartId, setPayPartId] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const [notice, setNotice] = useState("");
+  const [customSessions, setCustomSessions] = useState<string[]>([]);
 
   // Cohort form
   const [cCode, setCCode] = useState("");
@@ -109,11 +128,33 @@ export default function CohortDashboard({ initialCohorts, initialParticipants }:
   const [pClinic, setPClinic] = useState<string>(CLINICS[0]);
   const [pContact, setPContact] = useState("");
   const [pStart, setPStart] = useState("");
-  const [pSession, setPSession] = useState<string>(SESSIONS[0]);
+  const [pSession, setPSession] = useState<string>(DEFAULT_SESSIONS[0]);
   const [pStatus, setPStatus] = useState<PaymentStatus>("Pending");
   const [pAmount, setPAmount] = useState(0);
 
+  // Session form
+  const [sName, setSName] = useState("");
+  const [sTime, setSTime] = useState("");
+  const [assignSessionAfterCreate, setAssignSessionAfterCreate] = useState(false);
+
   const [payAmount, setPayAmount] = useState(0);
+
+  const sessions = useMemo(() => {
+    const seen = new Set<string>();
+    const ordered: string[] = [];
+    for (const label of [
+      ...DEFAULT_SESSIONS,
+      ...customSessions,
+      ...participants.map((p) => p.programSession ?? ""),
+      ...cohorts.map((c) => c.programSession ?? ""),
+    ]) {
+      const value = label.trim();
+      if (!value || seen.has(value)) continue;
+      seen.add(value);
+      ordered.push(value);
+    }
+    return ordered;
+  }, [customSessions, participants, cohorts]);
 
   const selectedCohort = cohorts.find((c) => c.id === selected) ?? null;
   const cohortSubset = useMemo(
@@ -139,21 +180,26 @@ export default function CohortDashboard({ initialCohorts, initialParticipants }:
   const cleared = cohortSubset.filter((p) => ["Paid in Full", "Free / Waived"].includes(paymentStatus(p))).length;
   const collected = cohortSubset.reduce((sum, p) => sum + Number(p.paidTotal ?? 0), 0);
   const outstanding = cohortSubset.reduce((sum, p) => sum + balance(p), 0);
+  const paidShown = filtered.reduce((sum, p) => sum + Number(p.paidTotal ?? 0), 0);
+  const balanceShown = filtered.reduce((sum, p) => sum + balance(p), 0);
 
   const clinicCounts: Record<string, number> = Object.fromEntries(CLINICS.map((c) => [c, 0]));
-  const sessionCounts: Record<string, number> = Object.fromEntries(SESSIONS.map((s) => [s, 0]));
+  const sessionCounts: Record<string, number> = Object.fromEntries(sessions.map((s) => [s, 0]));
   cohortSubset.forEach((p) => {
     if (p.clinic && p.clinic in clinicCounts) clinicCounts[p.clinic] += 1;
-    if (p.programSession && p.programSession in sessionCounts) sessionCounts[p.programSession] += 1;
+    const session = (p.programSession ?? "").trim();
+    if (!session) return;
+    sessionCounts[session] = (sessionCounts[session] ?? 0) + 1;
   });
   const maxClinic = Math.max(1, ...Object.values(clinicCounts));
   const maxSession = Math.max(1, ...Object.values(sessionCounts));
+  const sessionBars = Object.entries(sessionCounts).filter(([, count]) => count > 0);
 
   const filterSummary = [
     selectedCohort ? cohortLabel(selectedCohort) : "All Cohorts",
     filterClinic || "All Clinics",
     filterPayment || "All Payment Statuses",
-    filterSession ? filterSession.split(" (")[0] : "All Sessions",
+    filterSession ? sessionShort(filterSession) : "All Sessions",
     search.trim() ? `Search: "${search.trim()}"` : null,
   ]
     .filter(Boolean)
@@ -271,9 +317,21 @@ export default function CohortDashboard({ initialCohorts, initialParticipants }:
       setPClinic(CLINICS.includes(p.clinic ?? "") ? p.clinic! : CLINICS[0]);
       setPContact(p.phone ?? "");
       setPStart(p.startDate ?? "");
-      setPSession(SESSIONS.includes(p.programSession ?? "") ? p.programSession! : SESSIONS[0]);
-      setPStatus(paymentStatus(p));
-      setPAmount(Number(p.paidTotal ?? 0));
+      const existingSession = (p.programSession ?? "").trim();
+      if (existingSession) {
+        setCustomSessions((prev) => (prev.includes(existingSession) ? prev : [...prev, existingSession]));
+        setPSession(existingSession);
+      } else {
+        setPSession(sessions[0] ?? "");
+      }
+      const existingStatus = paymentStatus(p);
+      const existingFee = Number(cohort?.budget ?? p.lifetimeValue ?? 0);
+      setPStatus(existingStatus);
+      setPAmount(
+        existingStatus === "Paid in Full"
+          ? Math.max(Number(p.paidTotal ?? 0), existingFee)
+          : Number(p.paidTotal ?? 0),
+      );
     } else {
       const id0 = selected !== "all" ? selected : cohorts[0]?.id ?? "";
       const cohort = cohorts.find((c) => c.id === id0);
@@ -283,7 +341,7 @@ export default function CohortDashboard({ initialCohorts, initialParticipants }:
       setPAddress("");
       setPContact("");
       setPStart(cohort?.startDate || cohort?.dueOn || new Date().toISOString().slice(0, 10));
-      setPSession(SESSIONS[0]);
+      setPSession(sessions[0] ?? "");
       setPClinic(CLINICS[0]);
       setPStatus("Pending");
       setPAmount(0);
@@ -291,9 +349,36 @@ export default function CohortDashboard({ initialCohorts, initialParticipants }:
     setPartModal(true);
   }
 
+  function openSessionModal(assignToParticipant = false) {
+    setAssignSessionAfterCreate(assignToParticipant);
+    setSName("");
+    setSTime("");
+    setSessionModal(true);
+  }
+
+  function saveSession() {
+    const label = formatSessionLabel(sName, sTime);
+    if (!label) {
+      showNotice("Enter a session name.");
+      return;
+    }
+    if (label.length > 120) {
+      showNotice("Keep the session name under 120 characters.");
+      return;
+    }
+    setCustomSessions((prev) => (prev.includes(label) ? prev : [...prev, label]));
+    if (assignSessionAfterCreate) setPSession(label);
+    setSessionModal(false);
+    showNotice(assignSessionAfterCreate ? "Session created and selected." : "Session created. Use it when registering participants.");
+  }
+
   async function savePart() {
     if (!pName.trim()) {
       showNotice("Full name is required.");
+      return;
+    }
+    if (!pSession.trim() || pSession === "__new__") {
+      showNotice("Choose or create a programme session.");
       return;
     }
     const cohort = cohorts.find((c) => c.id === pCohort);
@@ -301,32 +386,54 @@ export default function CohortDashboard({ initialCohorts, initialParticipants }:
       showNotice("Select a cohort.");
       return;
     }
-    setBusy(true);
+    const existing = editPartId ? participants.find((p) => p.id === editPartId) : null;
     const fee = Number(cohort.budget ?? 0);
     const waived = pStatus === "Free / Waived";
-    const paidNow = pStatus === "Paid in Full" ? fee : pStatus === "Partial Payment" ? pAmount : 0;
+    const amountEntered = Number(pAmount);
+    if (!waived && (!Number.isFinite(amountEntered) || amountEntered < 0)) {
+      showNotice("Enter a valid amount paid (0 or more).");
+      return;
+    }
+    const targetPaid = waived ? 0 : Math.round(amountEntered * 100) / 100;
+    if (fee > 0 && targetPaid > fee) {
+      showNotice(`Amount paid can't be more than the cohort fee (UGX ${fee.toLocaleString()}).`);
+      return;
+    }
+    // The amount paid decides the status, so the two can never disagree.
+    const effectiveStatus: PaymentStatus = waived
+      ? "Free / Waived"
+      : targetPaid > 0 && fee > 0 && targetPaid >= fee
+        ? "Paid in Full"
+        : targetPaid > 0
+          ? "Partial Payment"
+          : "Pending";
+
+    setBusy(true);
     const today = new Date().toISOString().slice(0, 10);
+    const previousPaid = Math.round(Number(existing?.paidTotal ?? 0) * 100) / 100;
     const payload = {
       name: pName.trim(),
       company: pAddress.trim(),
-      email: "",
+      email: existing?.email ?? "",
       phone: pContact.trim(),
-      tier: "standard",
-      status: pStatus === "Paid in Full" ? "paid" : waived ? "dormant" : "active",
-      owner: "",
+      tier: existing?.tier ?? "standard",
+      status: effectiveStatus === "Paid in Full" ? "paid" : waived ? "dormant" : "active",
+      owner: existing?.owner ?? "",
       lifetimeValue: waived ? 0 : fee,
-      lastOrder: "",
-      issueOn: pStart || cohort.startDate || today,
-      services: [],
+      lastOrder: existing?.lastOrder ?? "",
+      issueOn: pStart || existing?.issueOn || cohort.startDate || today,
+      services: existing?.services ?? [],
       registrationNumber: pRegNo.trim() || nextRegNo(cohort),
       clinic: pClinic,
       programSession: pSession,
       cohort: cohort.name,
       startDate: pStart || cohort.startDate || "",
-      paidTotal: pStatus === "Paid in Full" ? fee : 0,
-      lastPaymentOn: "",
-      lastPaymentBy: "",
-      lastPaymentByEmail: "",
+      // Keep the previous total on create until the payment flow books it.
+      // On edit, set the corrected total (extra cash is booked as a sale below).
+      paidTotal: editPartId ? targetPaid : previousPaid,
+      lastPaymentOn: existing?.lastPaymentOn ?? "",
+      lastPaymentBy: existing?.lastPaymentBy ?? "",
+      lastPaymentByEmail: existing?.lastPaymentByEmail ?? "",
     };
     const res = await fetch(editPartId ? `/api/ops/customers/${editPartId}` : "/api/ops/customers", {
       method: editPartId ? "PATCH" : "POST",
@@ -341,14 +448,23 @@ export default function CohortDashboard({ initialCohorts, initialParticipants }:
     }
     let record = body.record as CustomerRecord;
 
-    // A new partial registration must also reach Sales via the normal payment flow.
-    if (!editPartId && pStatus === "Partial Payment" && paidNow > 0) {
+    // Book any increase through Sales so Fees Collected stays tied to real payments.
+    const increase = Math.round((targetPaid - previousPaid) * 100) / 100;
+    if (increase > 0 && !waived) {
       const payRes = await fetch(`/api/ops/customers/${record.id}/payments`, {
         method: "POST",
         headers: { "content-type": "application/json" },
-        body: JSON.stringify({ amount: paidNow, paidOn: today }),
+        body: JSON.stringify({ amount: increase, paidOn: today }),
       });
       const payBody = await payRes.json().catch(() => null);
+      if (!payRes.ok) {
+        setBusy(false);
+        showNotice(payBody?.error?.message ?? "Participant saved, but the payment could not be recorded.");
+        setParticipants((prev) =>
+          editPartId ? prev.map((p) => (p.id === record.id ? record : p)) : [record, ...prev],
+        );
+        return;
+      }
       if (payBody?.customer) record = payBody.customer as CustomerRecord;
     }
 
@@ -455,6 +571,9 @@ export default function CohortDashboard({ initialCohorts, initialParticipants }:
         <Button size="sm" variant="secondary" onClick={() => openPartModal(null)} disabled={busy || cohorts.length === 0}>
           <Users className="h-4 w-4" /> Register Participant
         </Button>
+        <Button size="sm" variant="secondary" onClick={() => openSessionModal(false)} disabled={busy}>
+          <Plus className="h-4 w-4" /> New Session
+        </Button>
         <Button size="sm" variant="secondary" onClick={() => window.print()}>
           <Download className="h-4 w-4" /> Export PDF
         </Button>
@@ -545,7 +664,7 @@ export default function CohortDashboard({ initialCohorts, initialParticipants }:
       <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
         <StatCard label="Registered Participants" value={formatNumber(total)} hint={selectedCohort ? "In selected cohort" : "Across all cohorts"} />
         <StatCard label="Cleared (Free/Paid)" value={formatNumber(cleared)} hint={`${total - cleared} pending/partial`} />
-        <StatCard label="Fees Collected" value={formatUgx(collected)} hint="UGX" />
+        <StatCard label="Fees Collected" value={formatUgx(collected)} hint="Sum of amount paid" />
         <StatCard label="Outstanding Balance" value={formatUgx(outstanding)} hint="UGX" />
       </div>
 
@@ -564,16 +683,29 @@ export default function CohortDashboard({ initialCohorts, initialParticipants }:
           ))}
         </Card>
         <Card className="p-4">
-          <p className="mb-3 text-sm font-semibold text-ink">Programme Session Distribution</p>
-          {SESSIONS.map((s) => (
-            <div key={s} className="mb-2 flex items-center gap-2">
-              <span className="w-40 truncate text-xs text-ink-soft">{s.split(" (")[0]}</span>
-              <div className="h-2 flex-1 rounded-full bg-slate-100">
-                <div className="h-2 rounded-full bg-emerald-500" style={{ width: `${(sessionCounts[s] / maxSession) * 100}%` }} />
+          <div className="mb-3 flex items-center justify-between gap-2">
+            <p className="text-sm font-semibold text-ink">Programme Session Distribution</p>
+            <button
+              type="button"
+              className="tc-no-print text-xs font-semibold text-emerald-700 hover:underline"
+              onClick={() => openSessionModal(false)}
+            >
+              + New session
+            </button>
+          </div>
+          {sessionBars.length === 0 ? (
+            <p className="text-sm text-ink-soft">No sessions in use yet. Create one, then assign it when registering a participant.</p>
+          ) : (
+            sessionBars.map(([s, count]) => (
+              <div key={s} className="mb-2 flex items-center gap-2">
+                <span className="w-40 truncate text-xs text-ink-soft" title={s}>{sessionShort(s)}</span>
+                <div className="h-2 flex-1 rounded-full bg-slate-100">
+                  <div className="h-2 rounded-full bg-emerald-500" style={{ width: `${(count / maxSession) * 100}%` }} />
+                </div>
+                <span className="w-8 text-right text-xs font-semibold text-navy">{count}</span>
               </div>
-              <span className="w-8 text-right text-xs font-semibold text-navy">{sessionCounts[s]}</span>
-            </div>
-          ))}
+            ))
+          )}
         </Card>
       </div>
 
@@ -600,7 +732,7 @@ export default function CohortDashboard({ initialCohorts, initialParticipants }:
         </Select>
         <Select value={filterSession} onChange={(e) => setFilterSession(e.target.value)}>
           <option value="">All Sessions</option>
-          {SESSIONS.map((s) => <option key={s} value={s}>{s.split(" (")[0]}</option>)}
+          {sessions.map((s) => <option key={s} value={s}>{sessionShort(s)}</option>)}
         </Select>
       </div>
 
@@ -617,6 +749,7 @@ export default function CohortDashboard({ initialCohorts, initialParticipants }:
                 <th className="px-3 py-2 text-left text-xs font-bold uppercase text-slate-500">Session</th>
                 <th className="px-3 py-2 text-left text-xs font-bold uppercase text-slate-500">Start Date</th>
                 <th className="px-3 py-2 text-left text-xs font-bold uppercase text-slate-500">Payment Status</th>
+                <th className="px-3 py-2 text-right text-xs font-bold uppercase text-slate-500">Amount paid (UGX)</th>
                 <th className="px-3 py-2 text-right text-xs font-bold uppercase text-slate-500">Balance (UGX)</th>
                 <th className="tc-no-print px-3 py-2 text-left text-xs font-bold uppercase text-slate-500">Actions</th>
               </tr>
@@ -624,11 +757,12 @@ export default function CohortDashboard({ initialCohorts, initialParticipants }:
             <tbody>
               {filtered.length === 0 ? (
                 <tr>
-                  <td colSpan={9} className="px-3 py-6 text-center text-slate-500">No participants match your filters.</td>
+                  <td colSpan={10} className="px-3 py-6 text-center text-slate-500">No participants match your filters.</td>
                 </tr>
               ) : (
                 filtered.map((p) => {
                   const status = paymentStatus(p);
+                  const paid = Number(p.paidTotal ?? 0);
                   const due = balance(p);
                   return (
                     <tr key={p.id} className="border-t border-slate-100 hover:bg-slate-50">
@@ -639,9 +773,10 @@ export default function CohortDashboard({ initialCohorts, initialParticipants }:
                       </td>
                       <td className="px-3 py-2 text-xs">{p.company || "—"}</td>
                       <td className="px-3 py-2 text-xs">{p.clinic || "—"}</td>
-                      <td className="px-3 py-2 text-xs">{(p.programSession || "").split(" (")[0]}</td>
+                      <td className="px-3 py-2 text-xs" title={p.programSession || undefined}>{sessionShort(p.programSession || "—")}</td>
                       <td className="px-3 py-2 text-xs">{shortDate(p.startDate)}</td>
                       <td className="px-3 py-2"><Badge tone={badgeTone(status)}>{status}</Badge></td>
+                      <td className="px-3 py-2 text-right font-bold text-emerald-700">{paid ? paid.toLocaleString() : "0"}</td>
                       <td className="px-3 py-2 text-right font-bold">{due ? due.toLocaleString() : "0"}</td>
                       <td className="tc-no-print px-3 py-2">
                         <div className="flex gap-1">
@@ -657,6 +792,18 @@ export default function CohortDashboard({ initialCohorts, initialParticipants }:
                 })
               )}
             </tbody>
+            {filtered.length > 0 ? (
+              <tfoot className="bg-slate-50">
+                <tr>
+                  <td colSpan={7} className="px-3 py-2 text-right text-xs font-bold uppercase text-slate-500">
+                    {filtered.length === cohortSubset.length ? "Total" : "Total in this list"}
+                  </td>
+                  <td className="px-3 py-2 text-right font-bold text-emerald-700">{paidShown.toLocaleString()}</td>
+                  <td className="px-3 py-2 text-right font-bold">{balanceShown.toLocaleString()}</td>
+                  <td className="tc-no-print" />
+                </tr>
+              </tfoot>
+            ) : null}
           </table>
         </div>
       </div>
@@ -714,18 +861,70 @@ export default function CohortDashboard({ initialCohorts, initialParticipants }:
           </Field>
           <Field label="Start Date"><Input type="date" value={pStart} onChange={(e) => setPStart(e.target.value)} /></Field>
           <Field label="Programme Session" className="col-span-2">
-            <Select value={pSession} onChange={(e) => setPSession(e.target.value)}>
-              {SESSIONS.map((s) => <option key={s}>{s}</option>)}
-            </Select>
+            <div className="flex gap-2">
+              <Select
+                value={pSession}
+                onChange={(e) => {
+                  if (e.target.value === "__new__") {
+                    openSessionModal(true);
+                    return;
+                  }
+                  setPSession(e.target.value);
+                }}
+                className="flex-1"
+              >
+                {sessions.length === 0 ? <option value="">No sessions yet</option> : null}
+                {sessions.map((s) => <option key={s} value={s}>{s}</option>)}
+                <option value="__new__">+ Create new session…</option>
+              </Select>
+            </div>
+            <p className="mt-1 text-[11px] text-ink-soft">Course masters can add any session name and time window.</p>
           </Field>
           <Field label="Payment Status">
-            <Select value={pStatus} onChange={(e) => setPStatus(e.target.value as PaymentStatus)}>
+            <Select
+              value={pStatus}
+              onChange={(e) => {
+                const next = e.target.value as PaymentStatus;
+                setPStatus(next);
+                const cohort = cohorts.find((c) => c.id === pCohort);
+                const fee = Number(cohort?.budget ?? 0);
+                if (next === "Paid in Full") setPAmount(fee);
+                if (next === "Pending" || next === "Free / Waived") setPAmount(0);
+              }}
+            >
               {PAYMENT_STATUSES.map((s) => <option key={s}>{s}</option>)}
             </Select>
           </Field>
-          {pStatus === "Partial Payment" ? (
-            <Field label="Amount Paid (UGX)"><Input type="number" min={0} value={pAmount} onChange={(e) => setPAmount(Number(e.target.value))} /></Field>
-          ) : null}
+          {pStatus === "Free / Waived" ? (
+            <Field label="Amount Paid (UGX)">
+              <Input type="number" value={0} disabled />
+            </Field>
+          ) : (
+            <Field label="Amount Paid (UGX)">
+              <Input
+                type="number"
+                min={0}
+                step="any"
+                value={Number.isNaN(pAmount) ? "" : pAmount}
+                onChange={(e) => {
+                  const next = e.target.value === "" ? 0 : Number(e.target.value);
+                  setPAmount(next);
+                  const fee = Number(cohorts.find((c) => c.id === pCohort)?.budget ?? 0);
+                  if (!Number.isFinite(next) || next <= 0) setPStatus("Pending");
+                  else if (fee > 0 && next >= fee) setPStatus("Paid in Full");
+                  else setPStatus("Partial Payment");
+                }}
+              />
+              <p className="mt-1 text-[11px] text-ink-soft">
+                {(() => {
+                  const fee = Number(cohorts.find((c) => c.id === pCohort)?.budget ?? 0);
+                  if (!fee) return "Total paid so far. The payment status updates to match.";
+                  const left = Math.max(0, fee - (Number(pAmount) || 0));
+                  return `Fee UGX ${fee.toLocaleString()} · balance UGX ${left.toLocaleString()}. Status updates to match.`;
+                })()}
+              </p>
+            </Field>
+          )}
         </div>
       </Modal>
 
@@ -740,6 +939,25 @@ export default function CohortDashboard({ initialCohorts, initialParticipants }:
             {participants.find((p) => p.id === payPartId)?.name} · Outstanding {formatUgx(participants.find((p) => p.id === payPartId) ? balance(participants.find((p) => p.id === payPartId)!) : 0)}
           </p>
           <Field label="Amount (UGX)"><Input type="number" min={1} value={payAmount} onChange={(e) => setPayAmount(Number(e.target.value))} /></Field>
+        </div>
+      </Modal>
+
+      <Modal
+        open={sessionModal}
+        title="New Programme Session"
+        onClose={() => setSessionModal(false)}
+        footer={<><Button variant="secondary" onClick={() => setSessionModal(false)}>Cancel</Button><Button onClick={saveSession}>Save Session</Button></>}
+      >
+        <div className="grid grid-cols-2 gap-3">
+          <Field label="Session name" className="col-span-2">
+            <Input value={sName} onChange={(e) => setSName(e.target.value)} placeholder="e.g. Evening Session" />
+          </Field>
+          <Field label="Time window (optional)" className="col-span-2">
+            <Input value={sTime} onChange={(e) => setSTime(e.target.value)} placeholder="e.g. 5:00 PM - 8:00 PM" />
+          </Field>
+          <p className="col-span-2 text-xs text-ink-soft">
+            Saved as {formatSessionLabel(sName || "Session name", sTime) || "…"}. Anyone registering participants can use this session afterwards.
+          </p>
         </div>
       </Modal>
     </div>
