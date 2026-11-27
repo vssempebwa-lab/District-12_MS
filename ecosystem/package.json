@@ -27,13 +27,17 @@
     "scaffold:tenant": "node scripts/scaffold-tenant.mjs",
     "check:deploy": "node scripts/check-deploy-env.mjs",
     "link:seed-users": "node scripts/link-seed-users.mjs",
+    "backup": "node scripts/backup-to-drive.mjs backup",
+    "backup:verify": "node scripts/backup-to-drive.mjs verify-latest",
+    "backup:list": "node scripts/backup-to-drive.mjs list",
+    "backup:auth": "node scripts/backup-to-drive.mjs auth",
     "telemetry:worker": "node apps/passito/worker/telemetry.mjs"
   },
   "dependencies": {
     "@supabase/supabase-js": "^2.58.0",
     "clsx": "^2.1.1",
     "lucide-react": "^0.446.0",
-    "next": "13.5.1",
+    "next": "13.5.11",
     "react": "18.2.0",
     "react-dom": "18.2.0",
     "tailwind-merge": "^2.5.2",

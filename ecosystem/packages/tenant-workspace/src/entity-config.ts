@@ -473,11 +473,6 @@ const CLINIC_OPTIONS: FieldOption[] = [
   { value: "sales", label: "Sales clinic" },
 ];
 
-const SESSION_OPTIONS: FieldOption[] = [
-  { value: "morning", label: "8:00am – 12:00pm" },
-  { value: "afternoon", label: "12:00pm – 4:00pm" },
-];
-
 const TALENT_CLINIC_CUSTOMERS: EntityConfig = {
   ...ENTITY_CONFIG.customers,
   description: "Clinic participants with registration, clinic module, cohort and payment status.",
@@ -500,7 +495,12 @@ const TALENT_CLINIC_CUSTOMERS: EntityConfig = {
     { key: "clinic", label: "Clinic", type: "select", options: CLINIC_OPTIONS, required: true },
     { key: "cohort", label: "Cohort", type: "text", placeholder: "Cohort name" },
     { key: "startDate", label: "Start date", type: "date" },
-    { key: "programSession", label: "Programme session", type: "select", options: SESSION_OPTIONS },
+    {
+      key: "programSession",
+      label: "Programme session",
+      type: "text",
+      placeholder: "e.g. Morning Session (8:30 AM - 11:30 AM)",
+    },
     { key: "status", label: "Payment status", type: "select", options: options(CUSTOMER_STATUSES) },
     { key: "owner", label: "Owner", type: "text" },
     { key: "lifetimeValue", label: "Registration fee (UGX)", type: "number" },
@@ -519,7 +519,7 @@ const TALENT_CLINIC_CUSTOMERS: EntityConfig = {
     lastPaymentBy: "",
     lastPaymentByEmail: "",
     clinic: "digital",
-    programSession: "morning",
+    programSession: "",
     startDate: TODAY,
   },
 };
@@ -540,7 +540,12 @@ const TALENT_CLINIC_PROJECTS: EntityConfig = {
     { key: "name", label: "Cohort name", type: "text", required: true, wide: true },
     { key: "startDate", label: "Start date", type: "date", required: true },
     { key: "durationWeeks", label: "Duration (weeks)", type: "number" },
-    { key: "programSession", label: "Programme session", type: "select", options: SESSION_OPTIONS },
+    {
+      key: "programSession",
+      label: "Programme session",
+      type: "text",
+      placeholder: "e.g. Morning Session (8:30 AM - 11:30 AM)",
+    },
     { key: "status", label: "Status", type: "select", options: options(PROJECT_STATUSES) },
     { key: "owner", label: "Owner", type: "text" },
     { key: "description", label: "Notes", type: "textarea", wide: true },
@@ -553,7 +558,7 @@ const TALENT_CLINIC_PROJECTS: EntityConfig = {
     dueOn: "",
     startDate: TODAY,
     durationWeeks: 6,
-    programSession: "morning",
+    programSession: "",
   },
 };
 

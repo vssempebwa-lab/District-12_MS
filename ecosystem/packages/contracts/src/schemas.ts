@@ -79,7 +79,7 @@ export const customerInputSchema = z.object({
   // Talent Clinic participant details (optional for other subsidiaries).
   registrationNumber: shortText(40),
   clinic: shortText(40),
-  programSession: shortText(40),
+  programSession: shortText(120),
   cohort: shortText(80),
   startDate: optionalDate,
   // Mariz partial-payment tracking, mirrored on the customer for quick reference.
@@ -160,7 +160,7 @@ export const projectInputSchema = z.object({
   dueOn: optionalDate,
   startDate: optionalDate,
   durationWeeks: z.coerce.number().min(1).max(52).default(6),
-  programSession: shortText(40),
+  programSession: shortText(120),
   owner: shortText(80),
   description: shortText(240),
 });
@@ -440,7 +440,6 @@ export const accountCreateSchema = z.object({
   role: z.enum(ROLE_IDS),
   tenants: z.array(z.enum(TENANT_IDS)).default([]),
   status: accountStatusSchema.default("active"),
-  password: accountPasswordSchema,
 });
 
 export const accountUpdateSchema = z
@@ -450,9 +449,21 @@ export const accountUpdateSchema = z
     role: z.enum(ROLE_IDS),
     tenants: z.array(z.enum(TENANT_IDS)),
     status: accountStatusSchema,
-    password: accountPasswordSchema,
   })
   .partial();
+
+export const passwordChangeSchema = z.object({
+  currentPassword: z.string().min(1, "Enter the temporary password").max(200),
+  newPassword: accountPasswordSchema,
+});
+
+export const mailSettingsSchema = z.object({
+  host: z.string().trim().max(253).default(""),
+  port: z.coerce.number().int().min(1).max(65535).default(587),
+  username: z.string().trim().max(320).default(""),
+  password: z.string().max(200).default(""),
+  from: z.union([z.string().trim().email("Enter a valid From address"), z.literal("")]).default(""),
+});
 
 export const accountTransferSchema = z
   .object({

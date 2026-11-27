@@ -1,0 +1,13 @@
+# Keep local secrets and unrelated folders out of CLI uploads.
+.env
+.env.*
+!.env.example
+!.env.production.example
+**/node_modules
+**/.next
+.git
+.claude
+legacy-erp
+*.jpeg
+*.jpg
+!ecosystem/apps/**/public/**

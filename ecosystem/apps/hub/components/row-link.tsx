@@ -7,18 +7,18 @@ export function RowLink({
   className,
   children,
 }: {
-  href: string;
+  href?: string;
   className?: string;
   children: ReactNode;
 }) {
   return (
     <tr
-      className={`${className ?? ""} cursor-pointer`}
-      onClick={(event) => {
+      className={href ? `${className ?? ""} cursor-pointer` : className}
+      onClick={href ? (event) => {
         const target = event.target as HTMLElement;
         if (target.closest("a,button,input,select,textarea")) return;
         window.location.assign(href);
-      }}
+      } : undefined}
     >
       {children}
     </tr>

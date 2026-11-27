@@ -1,5 +1,5 @@
 import { Activity, ArrowUpRight, Database, FileSignature, Layers } from "lucide-react";
-import { TENANTS } from "@d12/contracts";
+import { configuredTenantAppUrl, TENANTS, isTenantId } from "@d12/contracts";
 import {
   Alert,
   Badge,
@@ -53,7 +53,7 @@ export default async function WarehousePage() {
         </Alert>
       ) : null}
 
-      <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+      <div className="grid grid-cols-2 gap-3 xl:grid-cols-4">
         <StatCard
           label="Stored events"
           value={formatNumber(overview.totalEvents)}
@@ -106,10 +106,13 @@ export default async function WarehousePage() {
           <tbody>
             {overview.tenants.map((tenant) => {
               const meta = TENANTS[tenant.tenantId];
+              const openHref = configuredTenantAppUrl(tenant.tenantId)
+                ? `/api/auth/handoff?tenant=${tenant.tenantId}`
+                : undefined;
               return (
                 <RowLink
                   key={tenant.tenantId}
-                  href={`/api/auth/handoff?tenant=${tenant.tenantId}`}
+                  href={openHref}
                   className={rowClass}
                 >
                   <Td>
@@ -138,14 +141,16 @@ export default async function WarehousePage() {
                     {relativeTime(tenant.lastEventAt)}
                   </Td>
                   <Td className="text-right">
-                    <a
-                      href={`/api/auth/handoff?tenant=${tenant.tenantId}`}
-                      aria-label={`Open ${meta.shortName} workspace`}
-                      className="inline-flex items-center gap-1 rounded-md px-2 py-1 text-xs font-semibold text-navy hover:bg-canvas"
-                    >
-                      Open
-                      <ArrowUpRight className="h-3.5 w-3.5" />
-                    </a>
+                    {openHref ? (
+                      <a
+                        href={openHref}
+                        aria-label={`Open ${meta.shortName} workspace`}
+                        className="inline-flex items-center gap-1 rounded-md px-2 py-1 text-xs font-semibold text-navy hover:bg-canvas"
+                      >
+                        Open
+                        <ArrowUpRight className="h-3.5 w-3.5" />
+                      </a>
+                    ) : null}
                   </Td>
                 </RowLink>
               );
@@ -241,11 +246,14 @@ export default async function WarehousePage() {
             </thead>
             <tbody>
               {overview.batches.map((batch) => {
-                const meta = TENANTS[batch.tenantId];
+                const meta = isTenantId(batch.tenantId) ? TENANTS[batch.tenantId] : undefined;
+                const openHref = isTenantId(batch.tenantId) && configuredTenantAppUrl(batch.tenantId)
+                  ? `/api/auth/handoff?tenant=${batch.tenantId}`
+                  : undefined;
                 return (
                   <RowLink
                     key={batch.id}
-                    href={`/api/auth/handoff?tenant=${batch.tenantId}`}
+                    href={openHref}
                     className={rowClass}
                   >
                     <Td className="font-mono text-[11px] text-ink-soft">{batch.id}</Td>
@@ -273,14 +281,16 @@ export default async function WarehousePage() {
                       {relativeTime(batch.receivedAt)}
                     </Td>
                     <Td className="text-right">
-                      <a
-                        href={`/api/auth/handoff?tenant=${batch.tenantId}`}
-                        aria-label={`Open ${meta?.shortName ?? batch.tenantId} workspace`}
-                        className="inline-flex items-center gap-1 rounded-md px-2 py-1 text-xs font-semibold text-navy hover:bg-canvas"
-                      >
-                        Open
-                        <ArrowUpRight className="h-3.5 w-3.5" />
-                      </a>
+                      {openHref ? (
+                        <a
+                          href={openHref}
+                          aria-label={`Open ${meta?.shortName ?? batch.tenantId} workspace`}
+                          className="inline-flex items-center gap-1 rounded-md px-2 py-1 text-xs font-semibold text-navy hover:bg-canvas"
+                        >
+                          Open
+                          <ArrowUpRight className="h-3.5 w-3.5" />
+                        </a>
+                      ) : null}
                     </Td>
                   </RowLink>
                 );

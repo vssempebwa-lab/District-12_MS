@@ -28,7 +28,7 @@ export async function POST(request: Request): Promise<NextResponse> {
   }
 
   try {
-    const account = await createAccount(parsed.data, guard.session.sub);
+    const { account, mail } = await createAccount(parsed.data, guard.session.sub);
     try {
       await createHubRecord(
         "employees",
@@ -49,7 +49,7 @@ export async function POST(request: Request): Promise<NextResponse> {
       });
       throw error;
     }
-    return jsonOk({ account }, { status: 201 });
+    return jsonOk({ account, mail }, { status: 201 });
   } catch (error) {
     if (error instanceof AccountError) {
       return jsonError(error.code, error.message, error.status);

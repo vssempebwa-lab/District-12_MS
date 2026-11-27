@@ -10,12 +10,12 @@ import {
   Building2,
   CalendarDays,
   CheckSquare,
-  ChevronDown,
   Clock3,
   FileText,
   Folder,
   LayoutDashboard,
   LogOut,
+  Menu,
   Package,
   PhoneCall,
   Receipt,
@@ -26,6 +26,7 @@ import {
   Users,
   UsersRound,
   Wallet,
+  X,
   type LucideIcon,
 } from "lucide-react";
 import { hubAppUrl, type TenantId, type TenantMeta } from "@d12/contracts";
@@ -148,6 +149,13 @@ export function TenantShell({
   }, [pathname]);
 
   useEffect(() => {
+    if (!menuOpen) return;
+    const previous = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+    return () => { document.body.style.overflow = previous; };
+  }, [menuOpen]);
+
+  useEffect(() => {
     if (!shiftNote) return;
     const timer = window.setTimeout(() => setShiftNote(null), 5000);
     return () => window.clearTimeout(timer);
@@ -207,23 +215,9 @@ export function TenantShell({
 
   const startedAt = shiftStartLabel(shiftStartedAt);
 
-  return (
-    <div className="min-h-screen bg-canvas">
-      <aside className="fixed inset-y-0 left-0 z-40 hidden w-60 flex-col border-r border-line bg-white lg:flex">
-        <div className="flex shrink-0 items-center gap-2.5 px-5 pb-4 pt-6">
-          <BrandMark
-            mark={tenant.mark}
-            color={tenant.color}
-            logo={tenant.logo}
-            alt={`${tenant.shortName} logo`}
-          />
-          <div className="min-w-0">
-            <p className="truncate text-sm font-semibold tracking-tight text-ink">{tenant.shortName}</p>
-            <p className="truncate text-[11px] text-ink-mute">{tenant.sector}</p>
-          </div>
-        </div>
-
-        <nav className="min-h-0 flex-1 space-y-0.5 overflow-y-auto px-3 pb-3">
+  function renderNav(mobile: boolean): ReactNode {
+    return (
+      <>
           {items.map((item) => {
             const Icon = item.icon;
             const active = isActive(pathname, item.href);
@@ -231,9 +225,10 @@ export function TenantShell({
               <Link
                 key={item.href}
                 href={item.href}
+                onClick={mobile ? () => setMenuOpen(false) : undefined}
                 className={cn(
                   "flex items-center gap-2.5 rounded-lg px-3 text-sm font-medium transition-colors",
-                  compact ? "py-1.5" : "py-2",
+                  mobile ? "py-2.5" : compact ? "py-1.5" : "py-2",
                   active ? "text-white" : "text-ink-soft hover:bg-canvas hover:text-ink",
                 )}
                 style={active ? { backgroundColor: activeColor } : undefined}
@@ -251,12 +246,13 @@ export function TenantShell({
               <div className="space-y-0.5">
                 <Link
                   href="/?cohort=all"
+                  onClick={mobile ? () => setMenuOpen(false) : undefined}
                   className={cn(
                     "flex items-center gap-2 rounded-lg px-3 text-xs font-medium transition-colors",
                     pathname === "/" && activeCohortId === "all"
                       ? "bg-emerald-50 text-emerald-800"
                       : "text-ink-soft hover:bg-canvas hover:text-ink",
-                    compact ? "py-1.5" : "py-2",
+                    mobile ? "py-2.5" : compact ? "py-1.5" : "py-2",
                   )}
                 >
                   <span className="flex h-4 w-4 shrink-0 items-center justify-center rounded bg-slate-100 text-[9px] font-bold text-slate-600">
@@ -270,10 +266,11 @@ export function TenantShell({
                     <Link
                       key={cohort.id}
                       href={`/?cohort=${encodeURIComponent(cohort.id)}`}
+                      onClick={mobile ? () => setMenuOpen(false) : undefined}
                       title={cohort.label}
                       className={cn(
                         "flex items-center gap-2 rounded-lg px-3 text-xs font-medium transition-colors",
-                        compact ? "py-1.5" : "py-2",
+                        mobile ? "py-2.5" : compact ? "py-1.5" : "py-2",
                         active ? "bg-emerald-50 text-emerald-800" : "text-ink-soft hover:bg-canvas hover:text-ink",
                       )}
                     >
@@ -292,6 +289,28 @@ export function TenantShell({
               </div>
             </div>
           ) : null}
+      </>
+    );
+  }
+
+  return (
+    <div className="min-h-screen bg-canvas">
+      <aside className="fixed inset-y-0 left-0 z-40 hidden w-60 flex-col border-r border-line bg-white lg:flex">
+        <div className="flex shrink-0 items-center gap-2.5 px-5 pb-4 pt-6">
+          <BrandMark
+            mark={tenant.mark}
+            color={tenant.color}
+            logo={tenant.logo}
+            alt={`${tenant.shortName} logo`}
+          />
+          <div className="min-w-0">
+            <p className="truncate text-sm font-semibold tracking-tight text-ink">{tenant.shortName}</p>
+            <p className="truncate text-[11px] text-ink-mute">{tenant.sector}</p>
+          </div>
+        </div>
+
+        <nav className="min-h-0 flex-1 space-y-0.5 overflow-y-auto px-3 pb-3">
+          {renderNav(false)}
         </nav>
 
         <div className="shrink-0 space-y-3 border-t border-line px-3 pb-4 pt-3">
@@ -341,143 +360,107 @@ export function TenantShell({
       </aside>
 
       <header className="sticky top-0 z-30 border-b border-line bg-white lg:hidden">
-        <div className="flex items-center justify-between px-4 py-3">
-          <div className="flex min-w-0 items-center gap-2">
-            <BrandMark
-              mark={tenant.mark}
-              color={tenant.color}
-              logo={tenant.logo}
-              alt={`${tenant.shortName} logo`}
-              size="sm"
-            />
-            <div className="min-w-0">
-              <p className="truncate text-sm font-semibold leading-none text-ink">{tenant.shortName}</p>
-              <p className="mt-1 truncate text-[11px] leading-none text-ink-mute">{roleLabel}</p>
-            </div>
+        <div className="flex h-14 items-center gap-2 px-2">
+          <button
+            type="button"
+            aria-label="Open navigation"
+            aria-expanded={menuOpen}
+            aria-controls="tenant-drawer"
+            onClick={() => setMenuOpen(true)}
+            className="flex h-11 w-11 shrink-0 items-center justify-center rounded-lg text-ink hover:bg-canvas focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-navy"
+          >
+            <Menu className="h-5 w-5" />
+          </button>
+          <BrandMark
+            mark={tenant.mark}
+            color={tenant.color}
+            logo={tenant.logo}
+            alt={`${tenant.shortName} logo`}
+            size="sm"
+          />
+          <div className="min-w-0 flex-1">
+            <p className="truncate text-sm font-semibold leading-tight text-ink">{activeItem?.label ?? tenant.shortName}</p>
+            <p className="truncate text-[11px] leading-tight text-ink-mute">{activeItem ? tenant.shortName : roleLabel}</p>
           </div>
-          <div className="flex items-center gap-0.5">
-            <button
-              type="button"
-              onClick={onEndShift}
-              disabled={shiftPending}
-              aria-label="End shift"
-              title="End shift"
-              className="flex h-8 w-8 items-center justify-center rounded-lg text-ink-mute hover:bg-canvas hover:text-ink disabled:opacity-50"
-            >
-              <Clock3 className="h-4 w-4" />
-            </button>
-            <button
-              type="button"
-              onClick={logout}
-              disabled={pending}
-              aria-label="Sign out"
-              className="flex h-8 w-8 items-center justify-center rounded-lg text-ink-mute hover:bg-canvas hover:text-ink disabled:opacity-50"
-            >
-              <LogOut className="h-4 w-4" />
-            </button>
-          </div>
+          <button
+            type="button"
+            onClick={onEndShift}
+            disabled={shiftPending}
+            aria-label="End shift"
+            title="End shift"
+            className="flex h-10 w-10 items-center justify-center rounded-lg text-ink-soft hover:bg-canvas hover:text-ink focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-navy disabled:opacity-50"
+          >
+            <Clock3 className="h-[18px] w-[18px]" />
+          </button>
+          <button
+            type="button"
+            onClick={logout}
+            disabled={pending}
+            aria-label="Sign out"
+            title="Sign out"
+            className="flex h-10 w-10 items-center justify-center rounded-lg text-ink-soft hover:bg-canvas hover:text-ink focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-navy disabled:opacity-50"
+          >
+            <LogOut className="h-[18px] w-[18px]" />
+          </button>
         </div>
-        <button
-          type="button"
-          aria-expanded={menuOpen}
-          aria-controls="tenant-sections"
-          onClick={() => setMenuOpen((open) => !open)}
-          className="flex w-full items-center justify-between gap-3 border-t border-line px-4 py-2 text-left transition-colors hover:bg-canvas focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-navy"
-        >
-          <span className="flex min-w-0 items-center gap-2 text-xs font-semibold text-ink">
-            {activeItem ? (
-              <span
-                className="flex h-6 w-6 shrink-0 items-center justify-center rounded-md text-white"
-                style={{ backgroundColor: activeColor }}
-              >
-                <activeItem.icon className="h-3.5 w-3.5" />
-              </span>
-            ) : null}
-            <span className="truncate">{activeItem?.label ?? "Sections"}</span>
-          </span>
-          <span className="flex shrink-0 items-center gap-1 text-[11px] font-medium text-ink-soft">
-            All sections
-            <ChevronDown className={cn("h-3.5 w-3.5 transition-transform", menuOpen && "rotate-180")} />
-          </span>
-        </button>
-        {menuOpen ? (
-          <nav id="tenant-sections" aria-label="Workspace sections" className="max-h-[60vh] overflow-y-auto border-t border-line px-3 pb-3 pt-2">
-            <div className="grid grid-cols-2 gap-1 sm:grid-cols-3 md:grid-cols-4">
-              {items.map((item) => {
-                const Icon = item.icon;
-                const active = isActive(pathname, item.href);
-                return (
-                  <Link
-                    key={item.href}
-                    href={item.href}
-                    onClick={() => setMenuOpen(false)}
-                    className={cn(
-                      "flex min-w-0 items-center gap-2 rounded-lg px-2.5 text-xs font-medium",
-                      compact ? "py-1.5" : "py-2",
-                      active ? "text-white" : "bg-canvas text-ink-soft hover:text-ink",
-                    )}
-                    style={active ? { backgroundColor: activeColor } : undefined}
-                  >
-                    <Icon className="h-3.5 w-3.5 shrink-0" />
-                    <span className="truncate">{item.label}</span>
-                  </Link>
-                );
-              })}
-              {cohortLinks?.length ? (
-                <div className="col-span-full mt-2 border-t border-line pt-2">
-                  <p className="px-2.5 pb-1.5 text-[10px] font-semibold uppercase tracking-wider text-ink-mute">
-                    Cohort selector
-                  </p>
-                  <div className="grid grid-cols-2 gap-1 sm:grid-cols-3 md:grid-cols-4">
-                    <Link
-                      href="/?cohort=all"
-                      onClick={() => setMenuOpen(false)}
-                      className={cn(
-                        "flex min-w-0 items-center gap-2 rounded-lg px-2.5 text-xs font-medium",
-                        compact ? "py-1.5" : "py-2",
-                        pathname === "/" && activeCohortId === "all"
-                          ? "bg-emerald-50 text-emerald-800"
-                          : "bg-canvas text-ink-soft hover:text-ink",
-                      )}
-                    >
-                      <span className="flex h-4 w-4 shrink-0 items-center justify-center rounded bg-slate-100 text-[9px] font-bold text-slate-600">
-                        ALL
-                      </span>
-                      <span className="truncate">All Cohorts</span>
-                    </Link>
-                    {cohortLinks.map((cohort) => {
-                      const active = pathname === "/" && activeCohortId === cohort.id;
-                      return (
-                        <Link
-                          key={cohort.id}
-                          href={`/?cohort=${encodeURIComponent(cohort.id)}`}
-                          onClick={() => setMenuOpen(false)}
-                          title={cohort.label}
-                          className={cn(
-                            "flex min-w-0 items-center gap-2 rounded-lg px-2.5 text-xs font-medium",
-                            compact ? "py-1.5" : "py-2",
-                            active ? "bg-emerald-50 text-emerald-800" : "bg-canvas text-ink-soft hover:text-ink",
-                          )}
-                        >
-                          <span
-                            className={cn(
-                              "flex h-4 w-4 shrink-0 items-center justify-center rounded text-[9px] font-bold",
-                              active ? "bg-emerald-600 text-white" : "bg-slate-100 text-slate-600",
-                            )}
-                          >
-                            {cohort.code.slice(-2) || "•"}
-                          </span>
-                          <span className="truncate">{cohort.label}</span>
-                        </Link>
-                      );
-                    })}
-                  </div>
-                </div>
-              ) : null}
-            </div>
-          </nav>
-        ) : null}
       </header>
+
+      {menuOpen ? (
+        <div
+          className="fixed inset-0 z-50 lg:hidden"
+          role="dialog"
+          aria-modal="true"
+          aria-label="Workspace navigation"
+          onKeyDown={(event) => { if (event.key === "Escape") setMenuOpen(false); }}
+        >
+          <button
+            type="button"
+            aria-label="Close navigation"
+            tabIndex={-1}
+            onClick={() => setMenuOpen(false)}
+            className="absolute inset-0 bg-slate-900/50 animate-in fade-in"
+          />
+          <aside id="tenant-drawer" className="absolute inset-y-0 left-0 flex w-[86%] max-w-xs flex-col bg-white shadow-pop animate-in slide-in-from-left duration-200">
+            <div className="flex shrink-0 items-center gap-2.5 border-b border-line px-4 py-4">
+              <BrandMark mark={tenant.mark} color={tenant.color} logo={tenant.logo} alt={`${tenant.shortName} logo`} />
+              <div className="min-w-0 flex-1">
+                <p className="truncate text-sm font-semibold tracking-tight text-ink">{tenant.shortName}</p>
+                <p className="truncate text-[11px] text-ink-mute">{tenant.sector}</p>
+              </div>
+              <button
+                type="button"
+                autoFocus
+                aria-label="Close navigation"
+                onClick={() => setMenuOpen(false)}
+                className="flex h-10 w-10 items-center justify-center rounded-lg text-ink-soft hover:bg-canvas hover:text-ink focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-navy disabled:opacity-50 shrink-0"
+              >
+                <X className="h-5 w-5" />
+              </button>
+            </div>
+            <nav id="tenant-sections" aria-label="Workspace sections" className="min-h-0 flex-1 space-y-0.5 overflow-y-auto overscroll-contain px-3 py-3">
+              {renderNav(true)}
+            </nav>
+            <div className="shrink-0 space-y-3 border-t border-line px-4 py-3">
+              <div className="flex items-center gap-2.5">
+                <Avatar name={userName} />
+                <div className="min-w-0 flex-1">
+                  <p className="truncate text-sm font-medium text-ink">{userName}</p>
+                  <p className="truncate text-[11px] text-ink-mute">
+                    {roleLabel}{startedAt ? ` · on shift since ${startedAt}` : ""}
+                  </p>
+                </div>
+              </div>
+              <a
+                href={`${hubAppUrl()}/dashboard`}
+                className="flex h-10 items-center justify-between gap-2 rounded-lg border border-line px-3 text-sm font-medium text-ink-soft hover:border-navy/30 hover:text-ink"
+              >
+                Group hub
+                <ArrowUpRight className="h-4 w-4 text-ink-mute" />
+              </a>
+            </div>
+          </aside>
+        </div>
+      ) : null}
 
       <main className="lg:pl-60">
         <div className={cn("mx-auto w-full max-w-6xl px-4 sm:px-6 lg:px-8", compact ? "py-4" : "py-5")}>{children}</div>

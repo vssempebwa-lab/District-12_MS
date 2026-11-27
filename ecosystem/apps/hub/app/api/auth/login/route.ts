@@ -1,17 +1,10 @@
 import { NextResponse } from "next/server";
-import {
-  buildClaims,
-  createSessionToken,
-  isDemoMode,
-  landingFor,
-  safeLocalPath,
-  sessionCookie,
-  tenantCallbackUrl,
-} from "@d12/auth";
+import { isDemoMode } from "@d12/auth";
 import { loginSchema } from "@d12/contracts";
 import { hasServiceRoleEnv, hasSupabaseEnv } from "@d12/db";
 import { authenticateSupabase, demoSessionUser } from "@/lib/accounts";
 import { jsonError, zodDetails } from "@/lib/http";
+import { TwoFactorError, completeSignIn, startTwoFactor, twoFactorErrorResponse, twoFactorRequired } from "@/lib/two-factor";
 
 export async function POST(request: Request): Promise<NextResponse> {
   const body = await request.json().catch(() => null);
@@ -31,6 +24,7 @@ export async function POST(request: Request): Promise<NextResponse> {
     // Demo mode accepts the seeded directory. Everything else must pass
     // Supabase Auth and resolve to an active IAM account.
     let user = demo ? demoSessionUser(email, password) : null;
+    const isDemoUser = user !== null;
     if (!user) {
       if (!supabaseReady) {
         if (!demo) {
@@ -46,25 +40,11 @@ export async function POST(request: Request): Promise<NextResponse> {
       return jsonError("UNAUTHORIZED", "Incorrect email or password", 401);
     }
 
-    const claims = buildClaims(user);
-    const token = await createSessionToken(user);
-    const landing = landingFor(claims);
-    const redirectTo =
-      landing.kind === "tenant"
-        ? tenantCallbackUrl(token, landing.tenant, landing.path)
-        : safeLocalPath(next, landing.path);
-
-    return NextResponse.json(
-      {
-        ok: true,
-        redirect: redirectTo,
-        user: { id: claims.sub, email: claims.email, name: claims.name },
-        scope: claims.scope,
-        tenants: claims.tenants,
-      },
-      { headers: { "set-cookie": sessionCookie(token) } },
-    );
+    // Everyone confirms a code sent to their email before a session is issued.
+    if (twoFactorRequired(isDemoUser)) return await startTwoFactor(user, next ?? "");
+    return await completeSignIn(user, next ?? "");
   } catch (error) {
+    if (error instanceof TwoFactorError) return twoFactorErrorResponse(error);
     console.error("[d12] login failed", error);
     return jsonError("INTERNAL", "Sign-in is unavailable right now", 500);
   }

@@ -1,13 +1,13 @@
 "use client";
 
-import type { ReactNode } from "react";
+import { useEffect, useState, type ReactNode } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { ArrowLeft, ArrowUpRight, ChevronDown, ShieldCheck } from "lucide-react";
-import { isTenantId, TENANTS } from "@d12/contracts";
+import { ArrowLeft, ArrowUpRight, Menu, ShieldCheck, X } from "lucide-react";
+import { configuredTenantAppUrl, isTenantId, TENANTS } from "@d12/contracts";
 import { Avatar, BrandMark, cn } from "@d12/ui";
 import type { SessionClaims } from "@d12/auth";
-import { HubMobileNav, HubNav, HubTopbar, LogoutButton, isHrPath } from "./hub-nav";
+import { HR_ITEMS, HubNav, HubTopbar, LogoutButton, MAIN_ITEMS, isHrPath } from "./hub-nav";
 
 export function HubShell({
   session,
@@ -30,14 +30,31 @@ export function HubShell({
   const dark = isGroupAdmin && !hr;
   const subsidiaryLinks = tenants.map((id) => {
     const tenant = TENANTS[id];
-    return (
-      <a key={id} href={isAccountant ? `/finance#${id}` : `/api/auth/handoff?tenant=${id}`} className={cn("group flex items-center gap-3 rounded-lg px-3 py-2 transition-colors focus-visible:outline-none focus-visible:ring-2", dark ? "text-slate-200 hover:bg-navy-700 hover:text-white focus-visible:ring-white" : "text-ink-soft hover:bg-canvas hover:text-ink focus-visible:ring-navy")}>
+    const href = isAccountant ? `/finance#${id}` : configuredTenantAppUrl(id) ? `/api/auth/handoff?tenant=${id}` : undefined;
+    const className = cn("group flex items-center gap-3 rounded-lg px-3 py-2", href ? "transition-colors focus-visible:outline-none focus-visible:ring-2" : "", dark ? "text-slate-200" : "text-ink-soft", href && (dark ? "hover:bg-navy-700 hover:text-white focus-visible:ring-white" : "hover:bg-canvas hover:text-ink focus-visible:ring-navy"));
+    const body = (
+      <>
         <BrandMark mark={tenant.mark} color={tenant.color} logo={tenant.logo} alt={`${tenant.shortName} logo`} size="xs" className="rounded-lg" />
         <span className="min-w-0 flex-1 truncate text-sm">{tenant.shortName}</span>
-        <ArrowUpRight className="h-3.5 w-3.5 text-slate-400 opacity-0 transition-opacity group-hover:opacity-100" />
-      </a>
+        {href ? <ArrowUpRight className="h-3.5 w-3.5 text-slate-400 opacity-0 transition-opacity group-hover:opacity-100" /> : null}
+      </>
+    );
+    return href ? (
+      <a key={id} href={href} className={className}>{body}</a>
+    ) : (
+      <div key={id} className={className}>{body}</div>
     );
   });
+  const [drawerOpen, setDrawerOpen] = useState(false);
+  useEffect(() => { setDrawerOpen(false); }, [pathname]);
+  useEffect(() => {
+    if (!drawerOpen) return;
+    const previous = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+    return () => { document.body.style.overflow = previous; };
+  }, [drawerOpen]);
+  const sectionItems = hr ? HR_ITEMS : MAIN_ITEMS;
+  const activeSection = sectionItems.find((item) => (item.exact ? pathname === item.href : pathname.startsWith(item.href)))?.label;
   const subtitle = hr ? "Human resources" : finance ? "Group finance" : isGroupAdmin ? "Group ecosystem" : "Group reporting";
 
   return (
@@ -88,32 +105,72 @@ export function HubShell({
       </aside>
 
       <div className="lg:pl-64">
-        <header className="sticky top-0 z-30 border-b border-line bg-white">
-          <div className={cn("lg:hidden", dark ? "bg-navy text-white" : "bg-white text-ink")}>
-            <div className="flex items-center justify-between px-4 py-3">
-              <div className="flex items-center gap-2.5">
-                <img
-                  src="/brand/district12-mark.png"
-                  alt="The District 12 Group of Companies"
-                  className="h-9 w-9 shrink-0 rounded-lg object-cover ring-1 ring-black/5"
-                />
-                <div className="min-w-0"><p className="max-w-[160px] truncate text-sm font-semibold" title={organizationName}>{organizationName}</p><p className="text-[10px] text-slate-400">{subtitle}</p></div>
-              </div>
-              <div className="flex items-center gap-1">
-                {hr && isGroupAdmin ? (
-                  <Link href="/dashboard" aria-label="Group overview" className="rounded-lg p-2 text-ink-soft hover:bg-canvas focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-navy"><ArrowLeft className="h-4 w-4" /></Link>
-                ) : null}
-                <LogoutButton compact dark={dark} />
-              </div>
+        <div className={cn("sticky top-0 z-30 border-b lg:hidden", dark ? "border-white/10 bg-navy text-white" : "border-line bg-white text-ink")}>
+          <div className="flex h-14 items-center gap-2 px-2">
+            <button
+              type="button"
+              aria-label="Open navigation"
+              aria-expanded={drawerOpen}
+              aria-controls="hub-drawer"
+              onClick={() => setDrawerOpen(true)}
+              className={cn("flex h-11 w-11 shrink-0 items-center justify-center rounded-lg focus-visible:outline-none focus-visible:ring-2", dark ? "hover:bg-navy-700 focus-visible:ring-white" : "hover:bg-canvas focus-visible:ring-navy")}
+            >
+              <Menu className="h-5 w-5" />
+            </button>
+            <img
+              src="/brand/district12-mark.png"
+              alt=""
+              className="h-8 w-8 shrink-0 rounded-lg object-cover ring-1 ring-black/5"
+            />
+            <div className="min-w-0 flex-1">
+              <p className="truncate text-sm font-semibold leading-tight" title={organizationName}>{activeSection ?? organizationName}</p>
+              <p className={cn("truncate text-[11px] leading-tight", dark ? "text-slate-400" : "text-ink-soft")}>{activeSection ? `${organizationName} · ${subtitle}` : subtitle}</p>
             </div>
-            <HubMobileNav permissions={session.permissions} dark={dark} />
-            {!hr ? (
-              <details className={cn("relative border-t", dark ? "border-white/10" : "border-line")}>
-                <summary className={cn("flex cursor-pointer list-none items-center gap-2 px-4 py-2 text-xs", dark ? "text-slate-200" : "text-ink-soft")}>Subsidiaries<ChevronDown className="h-3 w-3" /><span className={cn("ml-auto text-[10px]", dark ? "text-emerald-300" : "text-emerald-700")}>SSO active</span></summary>
-                <nav aria-label="Mobile subsidiaries" className={cn("absolute left-0 right-0 z-40 space-y-1 px-3 py-3 shadow-pop", dark ? "bg-navy" : "bg-white")}>{subsidiaryLinks}</nav>
-              </details>
+            {hr && isGroupAdmin ? (
+              <Link href="/dashboard" aria-label="Group overview" className={cn("flex h-11 w-11 shrink-0 items-center justify-center rounded-lg focus-visible:outline-none focus-visible:ring-2", dark ? "hover:bg-navy-700 focus-visible:ring-white" : "text-ink-soft hover:bg-canvas focus-visible:ring-navy")}><ArrowLeft className="h-5 w-5" /></Link>
             ) : null}
           </div>
+        </div>
+
+        {drawerOpen ? (
+          <div className="fixed inset-0 z-50 lg:hidden" role="dialog" aria-modal="true" aria-label="Navigation" onKeyDown={(event) => { if (event.key === "Escape") setDrawerOpen(false); }}>
+            <button type="button" aria-label="Close navigation" tabIndex={-1} onClick={() => setDrawerOpen(false)} className="absolute inset-0 bg-slate-900/50 animate-in fade-in" />
+            <aside id="hub-drawer" className={cn("absolute inset-y-0 left-0 flex w-[86%] max-w-xs flex-col shadow-pop animate-in slide-in-from-left duration-200", dark ? "bg-navy text-white" : "bg-white text-ink")}>
+              <div className={cn("flex items-center gap-3 border-b px-4 py-4", dark ? "border-white/10" : "border-line")}>
+                <img src="/brand/district12-mark.png" alt="The District 12 Group of Companies" className="h-10 w-10 shrink-0 rounded-xl object-cover ring-1 ring-black/5" />
+                <div className="min-w-0 flex-1">
+                  <p className="truncate text-base font-semibold tracking-tight">{organizationName}</p>
+                  <p className="truncate text-[11px] text-slate-400">{subtitle}</p>
+                </div>
+                <button type="button" autoFocus aria-label="Close navigation" onClick={() => setDrawerOpen(false)} className={cn("flex h-10 w-10 shrink-0 items-center justify-center rounded-lg focus-visible:outline-none focus-visible:ring-2", dark ? "hover:bg-navy-700 focus-visible:ring-white" : "text-ink-soft hover:bg-canvas focus-visible:ring-navy")}>
+                  <X className="h-5 w-5" />
+                </button>
+              </div>
+              <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain px-3 py-4">
+                <HubNav permissions={session.permissions} isGroupAdmin={isGroupAdmin} dark={dark} />
+                {!hr ? (
+                  <div className={cn("mt-5 border-t pt-4", dark ? "border-white/10" : "border-line")}>
+                    <p className="mb-2 px-3 text-[10px] font-semibold uppercase tracking-[0.16em] text-slate-400">Subsidiaries</p>
+                    <nav aria-label="Mobile subsidiaries" className="space-y-1">{subsidiaryLinks}</nav>
+                  </div>
+                ) : null}
+              </div>
+              <div className={cn("border-t px-4 py-3", dark ? "border-white/10" : "border-line")}>
+                <div className="mb-2 flex items-center gap-2.5 px-1">
+                  <Avatar name={session.name} className="h-9 w-9 shrink-0" />
+                  <div className="min-w-0 flex-1">
+                    <p className={cn("truncate text-sm font-medium", dark ? "text-white" : "text-ink")}>{session.name}</p>
+                    <p className={cn("truncate text-[11px]", dark ? "text-slate-400" : "text-ink-soft")}>{roleLabel}</p>
+                  </div>
+                  <span className={cn("flex shrink-0 items-center gap-1 text-[11px] font-medium", dark ? "text-emerald-300" : "text-emerald-700")}><ShieldCheck className="h-3.5 w-3.5" />SSO</span>
+                </div>
+                <LogoutButton dark={dark} />
+              </div>
+            </aside>
+          </div>
+        ) : null}
+
+        <header className={cn("border-b border-line bg-white lg:sticky lg:top-0 lg:z-30", !dark && "hidden lg:block")}>
           <div className="px-4 py-4 sm:px-6 lg:px-8">
             {dark ? (
               <HubTopbar name={session.name} roleLabel={roleLabel} canProvision={canProvision} tenants={tenants} />

@@ -1,3 +1,5 @@
 const { createNextConfig } = require("../../next.config.base");
 
-module.exports = createNextConfig(__dirname);
+const config = createNextConfig(__dirname);
+config.experimental.serverComponentsExternalPackages = ["nodemailer"];
+module.exports = config;

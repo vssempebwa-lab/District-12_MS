@@ -28,6 +28,7 @@ export async function getHubSession(): Promise<SessionClaims | null> {
 export async function requireGroupPage(): Promise<SessionClaims> {
   const session = await getHubSession();
   if (!session) redirect("/login");
+  if (session.mustChangePassword) redirect("/account/password");
 
   if (session.scope !== "group") {
     const landing = landingFor(session);

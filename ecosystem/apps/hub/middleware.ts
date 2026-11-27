@@ -12,6 +12,10 @@ export async function middleware(request: NextRequest): Promise<NextResponse> {
     return NextResponse.redirect(loginUrl);
   }
 
+  if (session.mustChangePassword) {
+    return NextResponse.redirect(new URL("/account/password", request.url));
+  }
+
   const pathname = request.nextUrl.pathname;
   const permission = pathname.startsWith("/hr/payroll") ? "hr.payroll"
     : pathname.startsWith("/hr/reports") ? "hr.reports"

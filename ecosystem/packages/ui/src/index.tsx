@@ -139,17 +139,17 @@ export function StatCard({
   className?: string;
 }) {
   return (
-    <Card className={cn("p-4", className)}>
-      <div className="flex items-start justify-between gap-3">
+    <Card className={cn("p-3.5 sm:p-4", className)}>
+      <div className="flex items-start justify-between gap-2 sm:gap-3">
         <div className="min-w-0">
           <p className="text-[11px] font-medium text-ink-soft">{label}</p>
-          <p className="mt-1 text-2xl font-semibold leading-none tracking-tight text-ink">{value}</p>
+          <p className="mt-1 break-words text-xl font-semibold leading-tight tracking-tight text-ink sm:text-2xl sm:leading-none">{value}</p>
           {hint ? <p className="mt-2 text-[11px] leading-snug text-ink-mute">{hint}</p> : null}
         </div>
         {icon ? (
           <span
             className={cn(
-              "flex h-9 w-9 shrink-0 items-center justify-center rounded-full",
+              "hidden h-9 w-9 shrink-0 items-center justify-center rounded-full sm:flex",
               iconAccents[accent],
             )}
           >
@@ -334,19 +334,7 @@ export function MiniBars({
   );
 }
 
-export function TableShell({
-  children,
-  className,
-}: {
-  children: ReactNode;
-  className?: string;
-}) {
-  return (
-    <div className={cn("overflow-x-auto rounded-xl border border-line bg-white", className)}>
-      <table className="w-full min-w-[560px] border-collapse text-left text-sm">{children}</table>
-    </div>
-  );
-}
+export { TableShell } from "./table-shell";
 
 export function Th({ className, children, ...props }: ThHTMLAttributes<HTMLTableCellElement>) {
   return (
